@@ -4,15 +4,21 @@ const router = express.Router();
 const adminController = require('../controllers/admin.controller');
 const { verificarToken } = require('../middlewares/auth.middleware');
 
+// FIX: soloAdmin ahora verifica tanto rol === 'admin' como is_admin === 1,
+// igual que el middleware esAdmin en auth.middleware.js.
+// Antes solo verificaba rol, dejando fuera usuarios con is_admin = 1.
 function soloAdmin(req, res, next) {
-  if (!req.user || req.user.rol !== 'admin') {
-    return res.status(403).json({
-      ok: false,
-      mensaje: 'Acceso denegado. Solo administrador.'
-    });
+  if (
+    req.user &&
+    (req.user.rol === 'admin' || Number(req.user.is_admin) === 1)
+  ) {
+    return next();
   }
 
-  next();
+  return res.status(403).json({
+    ok: false,
+    mensaje: 'Acceso denegado. Solo administrador.'
+  });
 }
 
 router.get('/resumen', verificarToken, soloAdmin, adminController.resumen);
