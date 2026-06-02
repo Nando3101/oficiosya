@@ -152,3 +152,10 @@ app.use((req, res) => {
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Servidor OficiosYA corriendo en puerto ${PORT}`);
 });
+app.get('/api/version', (req, res) => {
+  res.json({
+    ok: true,
+    version: 'auth-fix-2026-06-02-1125',
+    mensaje: 'Railway está usando el código nuevo'
+  });
+});
