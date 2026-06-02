@@ -9,12 +9,16 @@ if (!connectionString) {
   process.exit(1);
 }
 
+const usarSSL =
+  process.env.NODE_ENV === 'production' &&
+  !connectionString.includes('railway.internal');
+
 const pgPool = new Pool({
   connectionString,
-  ssl:
-    process.env.NODE_ENV === 'production'
-      ? { rejectUnauthorized: false }
-      : false
+  ssl: usarSSL ? { rejectUnauthorized: false } : false,
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000
 });
 
 pgPool.on('connect', () => {
@@ -47,6 +51,7 @@ function normalizeParams(query, paramsByName) {
   const text = query.replace(/@([A-Za-z_][A-Za-z0-9_]*)/g, (_, name) => {
     if (!positions.has(name)) {
       positions.set(name, values.length + 1);
+
       values.push(
         Object.prototype.hasOwnProperty.call(paramsByName, name)
           ? paramsByName[name]
@@ -115,10 +120,15 @@ function convertSqlServerToPostgres(query) {
   q = q.replace(/\bGETUTCDATE\s*\(\s*\)/gi, 'NOW()');
   q = q.replace(/\bISNULL\s*\(/gi, 'COALESCE(');
   q = q.replace(/\bLEN\s*\(/gi, 'LENGTH(');
+
   q = q.replace(/\bBIT\b/gi, 'INTEGER');
+  q = q.replace(/\bDATETIME\b/gi, 'TIMESTAMP');
+
   q = q.replace(/\bNVARCHAR\s*\(\s*MAX\s*\)/gi, 'TEXT');
   q = q.replace(/\bVARCHAR\s*\(\s*MAX\s*\)/gi, 'TEXT');
   q = q.replace(/\bNVARCHAR\s*\(\s*\d+\s*\)/gi, 'VARCHAR');
+  q = q.replace(/\bNCHAR\s*\(\s*\d+\s*\)/gi, 'CHAR');
+
   q = q.replace(/\[([^\]]+)\]/g, '$1');
 
   q = q.replace(
@@ -169,13 +179,23 @@ const compatPool = {
 
   async query(text, values = []) {
     const converted = convertSqlServerToPostgres(text);
-    const result = await pgPool.query(converted, values);
 
-    return {
-      recordset: result.rows,
-      rows: result.rows,
-      rowCount: result.rowCount
-    };
+    try {
+      const result = await pgPool.query(converted, values);
+
+      return {
+        recordset: result.rows,
+        rows: result.rows,
+        rowCount: result.rowCount
+      };
+    } catch (error) {
+      console.error('\nError SQL PostgreSQL');
+      console.error('Consulta original:', text);
+      console.error('Consulta convertida:', converted);
+      console.error('Valores:', values);
+      console.error('Detalle:', error.message);
+      throw error;
+    }
   },
 
   raw: pgPool
@@ -193,9 +213,35 @@ const poolPromise = pgPool
     throw error;
   });
 
+async function probarConexion() {
+  try {
+    const result = await pgPool.query(`
+      SELECT 
+        current_database() AS database,
+        current_user AS usuario,
+        NOW() AS fecha
+    `);
+
+    console.log('Conexión PostgreSQL verificada:', result.rows[0]);
+
+    return {
+      ok: true,
+      data: result.rows[0]
+    };
+  } catch (error) {
+    console.error('Error al probar conexión PostgreSQL:', error.message);
+
+    return {
+      ok: false,
+      error: error.message
+    };
+  }
+}
+
 module.exports = {
   sql,
   poolPromise,
   pgPool,
+  probarConexion,
   convertSqlServerToPostgres
 };
