@@ -17,10 +17,6 @@ function usar(nombre) {
   return trabajadorController[nombre];
 }
 
-/*
-  IMPORTANTE:
-  Las rutas específicas deben ir ANTES de /:id.
-*/
 router.get('/profesionales', usar('listarProfesionales'));
 router.get('/destacados', usar('listarDestacados'));
 router.get('/categorias', usar('obtenerCategorias'));

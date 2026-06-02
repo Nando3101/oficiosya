@@ -1,41 +1,28 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
-const isProduction = process.env.NODE_ENV === 'production';
+const connectionString = process.env.DATABASE_URL;
 
-const connectionString =
-  process.env.DATABASE_URL ||
-  process.env.POSTGRES_URL ||
-  process.env.PG_URL;
-
-if (isProduction && !connectionString) {
-  console.error('ERROR: Falta DATABASE_URL en Railway.');
-  console.error('Agrega en el servicio Node.js: DATABASE_URL=${{Postgres.DATABASE_URL}}');
+if (!connectionString) {
+  console.error('ERROR: Falta DATABASE_URL.');
+  console.error('Configura DATABASE_URL en Railway → servicio oficiosya → Variables.');
   process.exit(1);
 }
 
-const poolConfig = connectionString
-  ? {
-      connectionString,
-      ssl: isProduction ? { rejectUnauthorized: false } : false
-    }
-  : {
-      host: process.env.PGHOST || process.env.DB_HOST || 'localhost',
-      port: Number(process.env.PGPORT || process.env.DB_PORT || 5432),
-      database: process.env.PGDATABASE || process.env.DB_DATABASE || 'oficiosya',
-      user: process.env.PGUSER || process.env.DB_USER || 'postgres',
-      password: process.env.PGPASSWORD || process.env.DB_PASSWORD || 'postgres',
-      ssl: false
-    };
-
-const pgPool = new Pool(poolConfig);
+const pgPool = new Pool({
+  connectionString,
+  ssl:
+    process.env.NODE_ENV === 'production'
+      ? { rejectUnauthorized: false }
+      : false
+});
 
 pgPool.on('connect', () => {
   console.log('Conectado correctamente a PostgreSQL');
 });
 
-pgPool.on('error', (err) => {
-  console.error('Error inesperado en PostgreSQL:', err.message);
+pgPool.on('error', (error) => {
+  console.error('Error inesperado en PostgreSQL:', error.message);
 });
 
 const sql = {
@@ -73,14 +60,20 @@ function normalizeParams(query, paramsByName) {
   return { text, values };
 }
 
-function appendReturning(query, returning) {
-  let q = query.trim().replace(/;\s*$/, '');
+function convertTop(query) {
+  const match = query.match(/^\s*SELECT\s+TOP\s+(\d+)\s+/i);
 
-  if (/\bRETURNING\b/i.test(q)) {
-    return q;
+  if (!match) return query;
+
+  const limit = match[1];
+
+  let converted = query.replace(/^\s*SELECT\s+TOP\s+\d+\s+/i, 'SELECT ');
+
+  if (!/\bLIMIT\b/i.test(converted)) {
+    converted = converted.trim().replace(/;\s*$/, '') + ` LIMIT ${limit}`;
   }
 
-  return `${q} RETURNING ${returning}`;
+  return converted;
 }
 
 function convertOutputClause(query) {
@@ -88,11 +81,6 @@ function convertOutputClause(query) {
   let returning = null;
 
   q = q.replace(/OUTPUT\s+INSERTED\.\*/gi, () => {
-    returning = '*';
-    return '';
-  });
-
-  q = q.replace(/OUTPUT\s+DELETED\.\*/gi, () => {
     returning = '*';
     return '';
   });
@@ -109,24 +97,8 @@ function convertOutputClause(query) {
     }
   );
 
-  if (returning) {
-    q = appendReturning(q, returning);
-  }
-
-  return q;
-}
-
-function convertTop(query) {
-  const top = query.match(/^\s*SELECT\s+TOP\s+(\d+)\s+/i);
-
-  if (!top) return query;
-
-  const n = top[1];
-
-  let q = query.replace(/^\s*SELECT\s+TOP\s+\d+\s+/i, 'SELECT ');
-
-  if (!/\bLIMIT\s+\d+\b/i.test(q)) {
-    q = q.trim().replace(/;\s*$/, '') + ` LIMIT ${n}`;
+  if (returning && !/\bRETURNING\b/i.test(q)) {
+    q = q.trim().replace(/;\s*$/, '') + ` RETURNING ${returning}`;
   }
 
   return q;
@@ -136,7 +108,6 @@ function convertSqlServerToPostgres(query) {
   let q = query;
 
   q = q.replace(/\r\n/g, '\n');
-
   q = convertOutputClause(q);
   q = convertTop(q);
 
@@ -144,18 +115,16 @@ function convertSqlServerToPostgres(query) {
   q = q.replace(/\bGETUTCDATE\s*\(\s*\)/gi, 'NOW()');
   q = q.replace(/\bISNULL\s*\(/gi, 'COALESCE(');
   q = q.replace(/\bLEN\s*\(/gi, 'LENGTH(');
-
+  q = q.replace(/\bBIT\b/gi, 'INTEGER');
   q = q.replace(/\bNVARCHAR\s*\(\s*MAX\s*\)/gi, 'TEXT');
   q = q.replace(/\bVARCHAR\s*\(\s*MAX\s*\)/gi, 'TEXT');
   q = q.replace(/\bNVARCHAR\s*\(\s*\d+\s*\)/gi, 'VARCHAR');
-  q = q.replace(/\bBIT\b/gi, 'INTEGER');
+  q = q.replace(/\[([^\]]+)\]/g, '$1');
 
   q = q.replace(
     /CAST\s*\(([^()]+?)\s+AS\s+FLOAT\s*\)/gi,
     'CAST($1 AS DOUBLE PRECISION)'
   );
-
-  q = q.replace(/\[([^\]]+)\]/g, '$1');
 
   return q;
 }

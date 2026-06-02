@@ -8,9 +8,10 @@ const helmet = require('helmet');
 const http = require('http');
 const { Server } = require('socket.io');
 
+const { pgPool } = require('./config/db');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
-
 const server = http.createServer(app);
 
 app.use(
@@ -119,15 +120,12 @@ cargarRuta('/api/chat', './routes/chat.routes');
 cargarRuta('/api/notificaciones', './routes/notificacion.routes');
 cargarRuta('/api/estado', './routes/estado.routes');
 
-const { pgPool } = require('./config/db');
-
 app.get('/api/debug/db', async (req, res) => {
   try {
-    const db = await pgPool.query(`
-      SELECT current_database() AS database,
-             current_user AS user,
-             inet_server_addr() AS host,
-             inet_server_port() AS port
+    const conexion = await pgPool.query(`
+      SELECT 
+        current_database() AS database,
+        current_user AS usuario
     `);
 
     const tablas = await pgPool.query(`
@@ -137,25 +135,52 @@ app.get('/api/debug/db', async (req, res) => {
       ORDER BY table_name
     `);
 
-    const categorias = await pgPool.query(`
-      SELECT COUNT(*) AS total FROM categorias
-    `).catch(error => ({ rows: [{ total: 'ERROR: ' + error.message }] }));
+    let totalCategorias = '0';
+    let totalUsuarios = '0';
+    let totalProfesionales = '0';
 
-    const usuarios = await pgPool.query(`
-      SELECT COUNT(*) AS total FROM usuarios
-    `).catch(error => ({ rows: [{ total: 'ERROR: ' + error.message }] }));
+    try {
+      const categorias = await pgPool.query(`SELECT COUNT(*) AS total FROM categorias`);
+      totalCategorias = categorias.rows[0].total;
+    } catch (error) {
+      totalCategorias = 'ERROR: ' + error.message;
+    }
 
-    res.json({
+    try {
+      const usuarios = await pgPool.query(`SELECT COUNT(*) AS total FROM usuarios`);
+      totalUsuarios = usuarios.rows[0].total;
+    } catch (error) {
+      totalUsuarios = 'ERROR: ' + error.message;
+    }
+
+    try {
+      const profesionales = await pgPool.query(`
+        SELECT COUNT(*) AS total
+        FROM usuarios u
+        LEFT JOIN perfiles_trabajador p ON p.usuario_id = u.id
+        WHERE u.es_trabajador = 1
+           OR u.rol IN ('trabajador', 'cliente_trabajador')
+           OR p.id IS NOT NULL
+      `);
+
+      totalProfesionales = profesionales.rows[0].total;
+    } catch (error) {
+      totalProfesionales = 'ERROR: ' + error.message;
+    }
+
+    return res.json({
       ok: true,
-      conexion: db.rows[0],
+      mensaje: 'Backend conectado a PostgreSQL',
+      conexion: conexion.rows[0],
       tablas: tablas.rows,
-      total_categorias: categorias.rows[0].total,
-      total_usuarios: usuarios.rows[0].total
+      total_categorias: totalCategorias,
+      total_usuarios: totalUsuarios,
+      total_profesionales: totalProfesionales
     });
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       ok: false,
-      mensaje: 'Error verificando base de datos',
+      mensaje: 'Error verificando PostgreSQL',
       error: error.message
     });
   }
