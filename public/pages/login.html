@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iniciar sesión — OficiosYA</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+
+<body class="auth-page">
+<div class="auth-layout">
+
+  <!-- PANEL IZQUIERDO -->
+  <div class="auth-left">
+    <a href="../index.html" class="auth-logo">
+      <div class="logo-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="8" r="4" fill="white" opacity=".9"/>
+          <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="white" stroke-width="2.2" stroke-linecap="round" fill="none" opacity=".9"/>
+          <circle cx="17" cy="6" r="3" fill="#C8860A" opacity=".85"/>
+        </svg>
+      </div>
+      <span class="logo-text">Oficios<span class="logo-ya">YA</span></span>
+    </a>
+
+    <div class="auth-left-content">
+      <h2 class="auth-left-title">Conectamos talento local con quienes lo necesitan.</h2>
+
+      <div class="testimonial">
+        <div class="test-avatar" style="background:#2563EB;">RM</div>
+        <div>
+          <div class="test-name">Roberto Mendoza</div>
+          <div class="test-text">"Conseguí 3 clientes nuevos la primera semana."</div>
+        </div>
+      </div>
+
+      <div class="testimonial">
+        <div class="test-avatar" style="background:#7C3AED;">LP</div>
+        <div>
+          <div class="test-name">Lucía Paredes</div>
+          <div class="test-text">"Muy fácil de usar, mis clientes confían más en mí."</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FORMULARIO -->
+  <div class="auth-right">
+    <div class="auth-form-wrapper">
+      <h1 class="auth-form-title">Bienvenido de vuelta</h1>
+      <p class="auth-form-sub">Ingresa tus datos para acceder</p>
+
+      <div id="alert-box" class="alert-box" style="display:none;"></div>
+
+      <form class="auth-form" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label class="form-label">Correo electrónico</label>
+          <div class="input-wrapper">
+            <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+              <polyline points="22,6 12,12 2,6"/>
+            </svg>
+            <input type="email" id="email" class="form-input" placeholder="tucorreo@email.com" required>
+          </div>
+          <span class="field-error" id="email-error"></span>
+        </div>
+
+        <div class="form-group">
+          <div class="label-row">
+            <label class="form-label">Contraseña</label>
+            <a href="olvide-password.html" class="forgot-link">¿Olvidaste tu contraseña?</a>
+          </div>
+
+          <div class="input-wrapper">
+            <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+
+            <input type="password" id="password" class="form-input" placeholder="Tu contraseña" required>
+
+            <button type="button" class="toggle-pass" onclick="togglePassword('password', this)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
+
+          <span class="field-error" id="pass-error"></span>
+        </div>
+
+        <div class="form-group" style="flex-direction:row;align-items:center;">
+          <label class="checkbox-label">
+            <input type="checkbox" id="remember" class="checkbox-input">
+            <span class="checkbox-custom"></span>
+            Recordar mi sesión
+          </label>
+        </div>
+
+        <button type="submit" class="btn-submit" id="submit-btn">
+          <span id="btn-text">Iniciar sesión</span>
+          <div id="btn-spinner" class="spinner" style="display:none;"></div>
+        </button>
+
+        <div class="form-divider">
+          <span>o continúa con</span>
+        </div>
+
+        <div class="social-btns">
+          <button type="button" class="social-btn" id="google-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            Google
+          </button>
+
+          <button type="button" class="social-btn" onclick="showAlert('Próximamente disponible.', 'info')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="#1877F2">
+              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+            </svg>
+            Facebook
+          </button>
+        </div>
+      </form>
+
+      <p class="auth-switch">
+        ¿No tienes cuenta?
+        <a href="registro.html" class="auth-switch-link">Regístrate gratis</a>
+      </p>
+    </div>
+  </div>
+
+</div>
+
+<script src="../js/config.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/navbar.js"></script>
+
+<script>
+function esAdmin(usuario) {
+  return usuario &&
+    (
+      usuario.rol === 'admin' ||
+      usuario.is_admin === true ||
+      usuario.is_admin === 1 ||
+      usuario.is_admin === '1'
+    );
+}
+
+function redirigirSegunRol(usuario) {
+  if (esAdmin(usuario)) {
+    window.location.href = 'admin.html';
+  } else {
+    window.location.href = 'dashboard.html';
+  }
+}
+
+// Redirigir si ya hay sesión
+const sesionActual = getSession();
+
+if (sesionActual && sesionActual.usuario) {
+  redirigirSegunRol(sesionActual.usuario);
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+
+  hideAlert();
+
+  document.getElementById('email-error').textContent = '';
+  document.getElementById('pass-error').textContent = '';
+
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+
+  let valid = true;
+
+  if (!isValidEmail(email)) {
+    document.getElementById('email-error').textContent = 'Correo no válido.';
+    valid = false;
+  }
+
+  if (!password) {
+    document.getElementById('pass-error').textContent = 'Ingresa tu contraseña.';
+    valid = false;
+  }
+
+  if (!valid) return;
+
+  setLoading(true);
+
+  try {
+    const data = await Auth.login({
+      email,
+      password
+    });
+
+    if (!data || !data.usuario || !data.token) {
+      throw new Error('Respuesta de inicio de sesión inválida.');
+    }
+
+    setSession(data);
+
+    showAlert('¡Bienvenido! Redirigiendo...', 'success');
+
+    setTimeout(() => {
+      redirigirSegunRol(data.usuario);
+    }, 700);
+
+  } catch (err) {
+    setLoading(false);
+    showAlert(err.message || 'Correo o contraseña incorrectos.', 'error');
+  }
+}
+</script>
+
+<!-- Google Identity Services -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
+<script>
+const GOOGLE_CLIENT_ID = '492507286056-4lp7kqr55bogg2lrnqofbq1170mtk62a.apps.googleusercontent.com';
+
+function initGoogleLogin() {
+  if (typeof google === 'undefined' || !google.accounts) {
+    return;
+  }
+
+  google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    callback: handleGoogleResponse,
+    auto_select: false
+  });
+
+  const googleBtn = document.getElementById('google-btn');
+
+  if (googleBtn && !googleBtn.dataset.configurado) {
+    googleBtn.dataset.configurado = 'true';
+
+    googleBtn.addEventListener('click', () => {
+      google.accounts.id.prompt();
+    });
+  }
+}
+
+document.addEventListener('DOMContentLoaded', initGoogleLogin);
+
+window.addEventListener('load', function () {
+  setTimeout(initGoogleLogin, 500);
+});
+
+async function handleGoogleResponse(response) {
+  try {
+    const data = await Auth.googleLogin(response.credential);
+
+    setSession(data);
+
+    showAlert('¡Bienvenido con Google! Redirigiendo...', 'success');
+
+    setTimeout(() => {
+      redirigirSegunRol(data.usuario);
+    }, 700);
+
+  } catch (err) {
+    showAlert(err.message || 'No se pudo iniciar sesión con Google.', 'error');
+  }
+}
+</script>
+<script>
+const FACEBOOK_APP_ID = 'TU_APP_ID_DE_FACEBOOK';
+
+window.fbAsyncInit = function() {
+  FB.init({
+    appId: FACEBOOK_APP_ID,
+    cookie: true,
+    xfbml: true,
+    version: 'v20.0'
+  });
+};
+
+(function(d, s, id){
+  let js;
+  const fjs = d.getElementsByTagName(s)[0];
+
+  if (d.getElementById(id)) return;
+
+  js = d.createElement(s);
+  js.id = id;
+  js.src = "https://connect.facebook.net/es_LA/sdk.js";
+  fjs.parentNode.insertBefore(js, fjs);
+}(document, 'script', 'facebook-jssdk'));
+
+async function loginFacebook() {
+  if (typeof FB === 'undefined') {
+    showAlert('Facebook SDK aún no está listo.', 'error');
+    return;
+  }
+
+  FB.login(async function(response) {
+    try {
+      if (!response.authResponse) {
+        showAlert('Inicio con Facebook cancelado.', 'info');
+        return;
+      }
+
+      const accessToken = response.authResponse.accessToken;
+
+      const data = await Auth.facebookLogin(accessToken);
+
+      setSession(data);
+
+      showAlert('¡Bienvenido con Facebook! Redirigiendo...', 'success');
+
+      setTimeout(() => {
+        redirigirSegunRol(data.usuario);
+      }, 700);
+
+    } catch (err) {
+      showAlert(err.message || 'No se pudo iniciar sesión con Facebook.', 'error');
+    }
+  }, {
+    scope: 'public_profile,email'
+  });
+}
+</script>
+</body>
+</html>

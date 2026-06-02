@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Seguimiento — OficiosYA</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f3f4f6;
+    }
+
+    .tracking-header {
+      padding: 16px;
+      background: #111827;
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .tracking-status {
+      font-size: 14px;
+      background: #1D9E75;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-weight: bold;
+    }
+
+    #map {
+      width: 100%;
+      height: calc(100vh - 78px);
+    }
+
+    .tracking-panel {
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      bottom: 20px;
+      background: white;
+      border-radius: 16px;
+      padding: 16px;
+      z-index: 999;
+      box-shadow: 0 10px 30px rgba(0,0,0,.2);
+    }
+
+    .tracking-panel h3 {
+      margin: 0 0 8px;
+    }
+
+    .tracking-panel p {
+      margin: 0;
+      color: #4b5563;
+    }
+
+    .tracking-warning {
+      background: #fef3c7;
+      color: #92400e;
+      padding: 10px;
+      border-radius: 10px;
+      margin: 10px 0;
+      font-size: 13px;
+      display: none;
+      font-weight: bold;
+    }
+
+    .tracking-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      border: none;
+      padding: 10px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .btn-primary {
+      background: #1D9E75;
+      color: white;
+    }
+
+    .btn-dark {
+      background: #111827;
+      color: white;
+    }
+
+    .btn-light {
+      background: #e5e7eb;
+      color: #111827;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="tracking-header">
+  <div><strong>Seguimiento del trabajador</strong></div>
+  <div class="tracking-status" id="estado-recorrido">Esperando ubicación</div>
+</div>
+
+<div id="map"></div>
+
+<div class="tracking-panel">
+  <h3>Recorrido en tiempo real</h3>
+  <p id="info-recorrido">Esperando datos del recorrido.</p>
+
+  <div class="tracking-warning" id="geo-warning">
+    La ubicación automática solo funciona en localhost o HTTPS. Desde IP local con HTTP puedes marcar la ubicación haciendo clic en el mapa.
+  </div>
+
+  <div class="tracking-actions">
+    <button class="btn btn-primary" onclick="abrirChat()">💬 Chat</button>
+    <button class="btn btn-light" onclick="guardarUbicacionCliente()">📍 Usar mi ubicación</button>
+    <button class="btn btn-light" onclick="activarUbicacionManual()">🖱️ Marcar en mapa</button>
+    <button class="btn btn-dark" onclick="volver()">Volver</button>
+  </div>
+</div>
+
+<script src="../js/config.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/notificaciones-ui.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const solicitudId = params.get('id');
+const sesion = getSession();
+
+let map;
+let marcadorCliente = null;
+let marcadorTrabajador = null;
+let lineaRuta = null;
+let socket = null;
+let modoManual = false;
+
+if (!sesion || !sesion.usuario) {
+  window.location.href = 'login.html';
+}
+
+if (!solicitudId) {
+  alert('No se recibió el ID de la solicitud.');
+  window.location.href = 'solicitudes.html';
+}
+
+function esOrigenSeguroParaUbicacion() {
+  const host = window.location.hostname;
+
+  return (
+    window.location.protocol === 'https:' ||
+    host === 'localhost' ||
+    host === '127.0.0.1'
+  );
+}
+
+function iniciarMapa() {
+  map = L.map('map').setView([-1.2543, -78.6229], 13);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '© OpenStreetMap'
+  }).addTo(map);
+
+  map.on('click', async function (e) {
+    if (!modoManual) return;
+
+    const latitud = e.latlng.lat;
+    const longitud = e.latlng.lng;
+
+    actualizarCliente(latitud, longitud);
+
+    try {
+      await TiempoReal.ubicacionCliente(solicitudId, latitud, longitud);
+      alert('Ubicación marcada manualmente.');
+      modoManual = false;
+    } catch (error) {
+      alert(error.message);
+    }
+  });
+
+  if (!esOrigenSeguroParaUbicacion()) {
+    document.getElementById('geo-warning').style.display = 'block';
+  }
+}
+
+function conectarSocket() {
+  const socketUrl = window.SOCKET_URL;
+
+  const script = document.createElement('script');
+  script.src = `${socketUrl}/socket.io/socket.io.js`;
+
+  script.onload = () => {
+    socket = io(socketUrl);
+
+    socket.emit('unirse_usuario', sesion.usuario.id);
+    socket.emit('unirse_solicitud', solicitudId);
+
+    socket.on('ubicacion_trabajador_actualizada', (data) => {
+      actualizarTrabajador(data.latitud, data.longitud, data.estado_recorrido);
+    });
+
+    socket.on('estado_recorrido_actualizado', (data) => {
+      document.getElementById('estado-recorrido').textContent = traducirEstado(data.estado_recorrido);
+    });
+  };
+
+  document.head.appendChild(script);
+}
+
+function traducirEstado(estado) {
+  const estados = {
+    pendiente: 'Pendiente',
+    trabajador_en_camino: 'Trabajador en camino',
+    trabajador_llego: 'Trabajador llegó',
+    en_curso: 'Trabajo en curso',
+    finalizada: 'Finalizada',
+    cancelada: 'Cancelada'
+  };
+
+  return estados[estado] || estado || 'Pendiente';
+}
+
+async function cargarDetalleSolicitud() {
+  try {
+    const solicitud = await Solicitudes.detalle(solicitudId);
+
+    if (solicitud.latitud_cliente && solicitud.longitud_cliente) {
+      actualizarCliente(solicitud.latitud_cliente, solicitud.longitud_cliente);
+    }
+
+    if (solicitud.latitud_trabajador && solicitud.longitud_trabajador) {
+      actualizarTrabajador(
+        solicitud.latitud_trabajador,
+        solicitud.longitud_trabajador,
+        solicitud.estado_recorrido
+      );
+    }
+
+    document.getElementById('estado-recorrido').textContent =
+      traducirEstado(solicitud.estado_recorrido || 'pendiente');
+
+    if (!solicitud.latitud_trabajador || !solicitud.longitud_trabajador) {
+      document.getElementById('info-recorrido').textContent =
+        'El trabajador todavía no ha compartido su ubicación.';
+    }
+
+  } catch (error) {
+    console.error(error);
+    document.getElementById('info-recorrido').textContent = error.message;
+  }
+}
+
+function actualizarCliente(latitud, longitud) {
+  const lat = Number(latitud);
+  const lng = Number(longitud);
+
+  if (!marcadorCliente) {
+    marcadorCliente = L.marker([lat, lng]).addTo(map).bindPopup('Cliente');
+  } else {
+    marcadorCliente.setLatLng([lat, lng]);
+  }
+
+  map.setView([lat, lng], 14);
+  dibujarRuta();
+}
+
+function actualizarTrabajador(latitud, longitud, estado) {
+  const lat = Number(latitud);
+  const lng = Number(longitud);
+
+  document.getElementById('estado-recorrido').textContent = traducirEstado(estado || 'trabajador_en_camino');
+  document.getElementById('info-recorrido').textContent = 'El trabajador está actualizando su ubicación.';
+
+  if (!marcadorTrabajador) {
+    marcadorTrabajador = L.marker([lat, lng]).addTo(map).bindPopup('Trabajador');
+  } else {
+    marcadorTrabajador.setLatLng([lat, lng]);
+  }
+
+  map.setView([lat, lng], 15);
+  dibujarRuta();
+}
+
+function dibujarRuta() {
+  if (!marcadorCliente || !marcadorTrabajador) return;
+
+  const puntos = [
+    marcadorCliente.getLatLng(),
+    marcadorTrabajador.getLatLng()
+  ];
+
+  if (!lineaRuta) {
+    lineaRuta = L.polyline(puntos, {
+      weight: 4
+    }).addTo(map);
+  } else {
+    lineaRuta.setLatLngs(puntos);
+  }
+
+  map.fitBounds(lineaRuta.getBounds(), {
+    padding: [40, 40]
+  });
+}
+
+function guardarUbicacionCliente() {
+  if (!esOrigenSeguroParaUbicacion()) {
+    alert('Desde IP local con HTTP no se puede usar ubicación automática. Usa el botón "Marcar en mapa".');
+    return;
+  }
+
+  if (!navigator.geolocation) {
+    alert('Tu navegador no permite geolocalización.');
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    async (position) => {
+      const latitud = position.coords.latitude;
+      const longitud = position.coords.longitude;
+
+      actualizarCliente(latitud, longitud);
+
+      try {
+        await TiempoReal.ubicacionCliente(solicitudId, latitud, longitud);
+        alert('Ubicación guardada correctamente.');
+      } catch (error) {
+        alert(error.message);
+      }
+    },
+    (error) => {
+      alert('No se pudo obtener ubicación: ' + error.message);
+    },
+    {
+      enableHighAccuracy: true,
+      maximumAge: 5000,
+      timeout: 10000
+    }
+  );
+}
+
+function activarUbicacionManual() {
+  modoManual = true;
+  alert('Haz clic en el mapa donde quieres marcar tu ubicación.');
+}
+
+function abrirChat() {
+  window.location.href = `chat.html?id=${solicitudId}`;
+}
+
+function volver() {
+  window.location.href = 'solicitudes.html';
+}
+
+iniciarMapa();
+conectarSocket();
+cargarDetalleSolicitud();
+</script>
+
+</body>
+</html>

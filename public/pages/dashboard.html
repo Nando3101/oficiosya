@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mi Panel — OficiosYA</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <style>
+    .dash-wrap    { max-width:960px; margin:0 auto; padding:32px 24px; }
+    .dash-welcome { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:28px; }
+    .dash-title   { font-size:26px; font-weight:800; letter-spacing:-.4px; }
+    .dash-sub     { font-size:14px; color:#6B7280; margin-top:4px; }
+    .mode-switcher{ display:flex; background:#fff; border:1.5px solid #E5E7EB; border-radius:10px; padding:4px; gap:4px; }
+    .mode-btn     { padding:8px 18px; border-radius:7px; border:none; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; color:#6B7280; background:transparent; transition:all .15s; }
+    .mode-btn.active{ background:#1D9E75; color:#fff; }
+    .stats-row    { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:16px; margin-bottom:28px; }
+    .stat-card    { background:#fff; border-radius:12px; border:1px solid #E5E7EB; padding:18px; display:flex; align-items:center; gap:14px; }
+    .stat-icon    { width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:20px; }
+    .stat-val     { font-size:24px; font-weight:800; letter-spacing:-.5px; }
+    .stat-lbl     { font-size:12px; color:#6B7280; font-weight:500; }
+    .panel-grid   { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+    .panel-card   { background:#fff; border-radius:12px; border:1px solid #E5E7EB; padding:20px; }
+    .panel-title  { font-size:15px; font-weight:700; margin-bottom:14px; }
+    .quick-list   { display:flex; flex-direction:column; gap:8px; }
+    .quick-item   { display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:8px; border:1px solid #F3F4F6; text-decoration:none; color:#111827; font-size:13px; font-weight:500; transition:all .15s; cursor:pointer; background:none; font-family:inherit; width:100%; text-align:left; }
+    .quick-item:hover{ border-color:#1D9E75; background:#F0FDF4; color:#0F6E56; }
+    .quick-item svg{ color:#1D9E75; flex-shrink:0; }
+    .empty-panel  { text-align:center; padding:28px; color:#9CA3AF; font-size:13px; }
+    .tag-verificado{ display:inline-flex; align-items:center; gap:5px; background:#D1FAE5; color:#065F46; font-size:11px; font-weight:600; padding:3px 10px; border-radius:999px; }
+    .tag-no-verif  { display:inline-flex; align-items:center; gap:5px; background:#FEF3C7; color:#92400E; font-size:11px; font-weight:600; padding:3px 10px; border-radius:999px; cursor:pointer; }
+    .tag-no-verif:hover { background:#FDE68A; }
+    .change-pass-form{ display:flex; flex-direction:column; gap:12px; margin-top:14px; }
+    .modal-overlay{ position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:500;padding:16px; }
+    .modal-box    { background:#fff;border-radius:16px;padding:28px;width:100%;max-width:480px;position:relative;max-height:90vh;overflow-y:auto; }
+    .modal-close  { position:absolute;top:12px;right:12px;width:28px;height:28px;background:#F3F4F6;border:none;border-radius:50%;cursor:pointer;font-size:14px;color:#6B7280; }
+    .modal-title  { font-size:18px;font-weight:800;margin-bottom:18px; }
+    .sol-card     { background:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;padding:14px;margin-bottom:10px; }
+    .sol-titulo   { font-size:14px;font-weight:700;color:#111827;margin-bottom:4px; }
+    .sol-meta     { font-size:11px;color:#6B7280;display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px; }
+    .sol-estado   { display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px; }
+    .e-abierta    { background:#D1FAE5;color:#065F46; }
+    .e-cancelada  { background:#FEE2E2;color:#991B1B; }
+    .e-confirmada { background:#DBEAFE;color:#1E40AF; }
+    .btn-cancel-sol{ font-size:11px;color:#EF4444;background:none;border:none;cursor:pointer;font-family:inherit;padding:0;font-weight:600; }
+    .trab-section { margin-top:20px; }
+    .trab-grid    { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px; margin-top:10px; }
+    .trab-card    { position:relative; border-radius:10px; overflow:hidden; border:1px solid #E5E7EB; background:#F9FAFB; }
+    .trab-card img{ width:100%; height:110px; object-fit:cover; display:block; }
+    .trab-card .trab-desc { font-size:11px; color:#6B7280; padding:6px 8px; }
+    .trab-card .btn-del   { position:absolute;top:5px;right:5px;background:rgba(239,68,68,.9);color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center; }
+    .doc-badge    { display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px; }
+    .doc-pendiente{ background:#FEF3C7;color:#92400E; }
+    .doc-aprobada { background:#D1FAE5;color:#065F46; }
+    .doc-rechazada{ background:#FEE2E2;color:#991B1B; }
+    .doc-item     { display:flex;align-items:center;gap:10px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:10px;margin-bottom:8px; }
+    .doc-item img { width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0; }
+    .upload-btn   { display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:#1D9E75;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit; }
+    .upload-btn:hover{ background:#0F6E56; }
+    @media(max-width:700px){ .panel-grid{grid-template-columns:1fr;} }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-container">
+    <a href="../index.html" class="nav-logo">
+      <div class="logo-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" fill="white" opacity=".9"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="white" stroke-width="2.2" stroke-linecap="round" fill="none"/><circle cx="17" cy="6" r="3" fill="#C8860A"/></svg></div>
+      <span class="logo-text">Oficios<span class="logo-ya">YA</span></span>
+    </a>
+    <div class="nav-links">
+      <a href="dashboard.html" class="nav-link active">Mi Panel</a>
+      <a href="explorar.html" class="nav-link">Explorar</a>
+      <a href="solicitudes.html" class="nav-link">Solicitudes</a>
+      <a href="perfil.html" class="nav-link">Mi Perfil</a>
+    </div>
+    <div class="nav-actions nav-user-area" id="nav-auth">
+      <div class="nav-avatar-btn" onclick="toggleUserMenu()">
+        <div class="nav-avatar" id="nav-avatar">U</div>
+        <span id="nav-username">Usuario</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="user-dropdown" id="userDropdown" style="display:none;">
+        <div style="padding:12px 16px; border-bottom:1px solid #E5E7EB;">
+          <div style="font-weight:600; font-size:14px;" id="drop-name">—</div>
+          <div style="font-size:12px; color:#6B7280;" id="drop-email">—</div>
+        </div>
+        <a href="perfil.html" class="dropdown-item">Mi perfil</a>
+        <a href="dashboard.html" class="dropdown-item">Mi panel</a>
+        <div class="dropdown-divider"></div>
+        <button class="dropdown-item dropdown-logout" onclick="logout()">Cerrar sesion</button>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div class="dash-wrap">
+  <div class="dash-welcome">
+    <div>
+      <div class="dash-title">Hola, <span id="welcome-name">Usuario</span></div>
+      <div class="dash-sub" id="welcome-sub">Bienvenido a tu panel de OficiosYA</div>
+    </div>
+    <div class="mode-switcher">
+      <button class="mode-btn active" id="btn-cliente"   onclick="setMode('cliente')">Modo Cliente</button>
+      <button class="mode-btn"       id="btn-trabajador" onclick="setMode('trabajador')">Modo Trabajador</button>
+    </div>
+  </div>
+
+  <div id="alert-box" class="alert-box" style="display:none; margin-bottom:16px;"></div>
+  <div class="stats-row" id="stats-row"></div>
+
+  <!-- PANEL CLIENTE -->
+  <div id="panel-cliente">
+    <div class="panel-grid">
+      <div class="panel-card">
+        <div class="panel-title">Acciones rapidas</div>
+        <div class="quick-list">
+          <button class="quick-item" onclick="abrirModalSolicitud()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+            Publicar nueva solicitud
+          </button>
+          <a href="explorar.html" class="quick-item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            Buscar profesionales
+          </a>
+          <a href="solicitudes.html" class="quick-item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Ver todas las solicitudes
+          </a>
+          <a href="perfil.html" class="quick-item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Editar mi perfil
+          </a>
+        </div>
+      </div>
+      <div class="panel-card">
+        <div class="panel-title">Mis solicitudes recientes</div>
+        <div id="mis-solicitudes-lista"><div class="empty-panel">Cargando...</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PANEL TRABAJADOR -->
+  <div id="panel-trabajador" style="display:none;">
+    <div class="panel-grid">
+      <div class="panel-card">
+        <div class="panel-title">Acciones rapidas</div>
+        <div class="quick-list">
+          <a href="solicitudes.html" class="quick-item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/></svg>
+            Ver solicitudes disponibles
+          </a>
+          <a href="perfil.html" class="quick-item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Editar mi perfil profesional
+          </a>
+        </div>
+      </div>
+      <div class="panel-card">
+        <div class="panel-title">Solicitudes disponibles</div>
+        <div id="solicitudes-trabajador-lista"><div class="empty-panel">Cargando...</div></div>
+      </div>
+    </div>
+
+    <div class="trab-section">
+      <div class="panel-card">
+        <div class="panel-title">Mi perfil profesional</div>
+        <div id="alert-prof" class="alert-box" style="display:none;margin-bottom:12px;"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Titulo profesional</label>
+            <input type="text" id="prof-titulo" class="form-input" placeholder="Ej: Electricista certificado">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Categoria</label>
+            <select id="prof-categoria" class="form-input">
+              <option value="">Selecciona una categoria</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">Anos de experiencia</label>
+            <input type="number" id="prof-experiencia" class="form-input" placeholder="Ej: 5" min="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Precio desde ($)</label>
+            <input type="number" id="prof-precio" class="form-input" placeholder="Ej: 20" min="0">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Descripcion / Sobre mi</label>
+          <textarea id="prof-descripcion" class="form-input" rows="3" placeholder="Describe tus habilidades..." style="resize:vertical;"></textarea>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+          <input type="checkbox" id="prof-disponible" checked style="width:16px;height:16px;accent-color:#1D9E75;">
+          <label for="prof-disponible" style="font-size:13px;font-weight:500;">Disponible para trabajar</label>
+        </div>
+        <button class="btn-submit" id="btn-guardar-prof" onclick="guardarPerfilProfesional()">
+          <span id="btn-prof-text">Guardar perfil profesional</span>
+          <div id="btn-prof-spinner" class="spinner" style="display:none;"></div>
+        </button>
+      </div>
+    </div>
+
+    <div class="trab-section">
+      <div class="panel-card">
+        <div class="panel-title">Mis trabajos realizados</div>
+        <div id="alert-trab" class="alert-box" style="display:none;margin-bottom:12px;"></div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
+          <label class="upload-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Subir imagen
+            <input type="file" id="input-imagen-trabajo" accept="image/*" style="display:none;" onchange="subirTrabajo()">
+          </label>
+          <input type="text" id="input-desc-trabajo" class="form-input" placeholder="Descripcion opcional" style="flex:1;min-width:180px;">
+        </div>
+        <div id="mis-trabajos-grid" class="trab-grid"><div class="empty-panel" style="grid-column:1/-1;">Cargando...</div></div>
+      </div>
+    </div>
+
+    <div class="trab-section">
+      <div class="panel-card">
+        <div class="panel-title">Mi documentacion</div>
+        <div id="alert-doc" class="alert-box" style="display:none;margin-bottom:12px;"></div>
+        <p style="font-size:13px;color:#6B7280;margin-bottom:12px;">Sube documentos para verificar tu identidad o certificaciones.</p>
+        <label class="upload-btn" style="margin-bottom:14px;display:inline-flex;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Subir documento
+          <input type="file" id="input-documento" accept="image/*,.pdf" style="display:none;" onchange="subirDocumento()">
+        </label>
+        <div id="mis-docs-lista"><div class="empty-panel">Cargando...</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SEGURIDAD -->
+  <div style="margin-top:24px;">
+    <div class="panel-card">
+      <div class="panel-title">Seguridad de la cuenta</div>
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+        <div>
+          <div style="font-size:13px; color:#6B7280;">Contrasena</div>
+          <div style="font-size:14px; font-weight:600;">••••••••••</div>
+        </div>
+        <button class="quick-item" style="width:auto;" onclick="toggleChangePass()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Cambiar contrasena
+        </button>
+      </div>
+      <div id="change-pass-form" style="display:none; margin-top:16px; border-top:1px solid #F3F4F6; padding-top:16px;">
+        <div id="alert-pass" class="alert-box" style="display:none; margin-bottom:12px;"></div>
+        <div class="change-pass-form">
+          <div class="form-group">
+            <label class="form-label">Contrasena actual</label>
+            <input type="password" id="pass-actual" class="form-input" placeholder="Tu contrasena actual">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nueva contrasena</label>
+            <input type="password" id="pass-nueva" class="form-input" placeholder="Minimo 8 caracteres" oninput="checkPasswordStrength(this.value)">
+            <div class="password-strength" id="pass-strength" style="display:none;">
+              <div class="strength-bars"><div class="strength-bar" id="bar1"></div><div class="strength-bar" id="bar2"></div><div class="strength-bar" id="bar3"></div><div class="strength-bar" id="bar4"></div></div>
+              <span id="strength-label"></span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Confirmar nueva contrasena</label>
+            <input type="password" id="pass-confirmar" class="form-input" placeholder="Repite la nueva contrasena">
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button class="btn-submit" style="flex:1;" id="submit-btn" onclick="handleChangePass()">
+              <span id="btn-text">Guardar contrasena</span>
+              <div id="btn-spinner" class="spinner" style="display:none;"></div>
+            </button>
+            <button onclick="toggleChangePass()" style="padding:10px 16px; border:1.5px solid #E5E7EB; border-radius:8px; background:#fff; cursor:pointer; font-family:inherit; font-size:13px;">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PUBLICAR SOLICITUD -->
+<div class="modal-overlay" id="modalSolicitud" style="display:none;" onclick="if(event.target===this)cerrarModalSolicitud()">
+  <div class="modal-box">
+    <button class="modal-close" onclick="cerrarModalSolicitud()">X</button>
+    <div class="modal-title">Publicar Solicitud</div>
+    <div id="alert-sol" class="alert-box" style="display:none;margin-bottom:12px;"></div>
+    <div class="form-group">
+      <label class="form-label">Que necesitas? *</label>
+      <input type="text" id="sol-titulo" class="form-input" placeholder="Ej: Reparar fuga en el bano">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Categoria</label>
+      <select id="sol-categoria" class="form-input">
+        <option value="">Selecciona una categoria</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Descripcion</label>
+      <textarea id="sol-descripcion" class="form-input" rows="3" placeholder="Describe el trabajo con mas detalle..." style="resize:vertical;"></textarea>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="form-group">
+        <label class="form-label">Zona / Sector</label>
+        <input type="text" id="sol-zona" class="form-input" placeholder="Ej: Centro, Norte...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Presupuesto ($)</label>
+        <input type="number" id="sol-presupuesto" class="form-input" placeholder="Opcional">
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="form-group">
+        <label class="form-label">Fecha preferida</label>
+        <input type="date" id="sol-fecha" class="form-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Urgencia</label>
+        <select id="sol-urgencia" class="form-input">
+          <option value="normal">Normal</option>
+          <option value="urgente">Urgente</option>
+          <option value="flexible">Flexible</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn-submit" id="btn-publicar" onclick="publicarSolicitud()">
+      <span id="btn-publicar-text">Publicar solicitud</span>
+      <div id="btn-publicar-spinner" class="spinner" style="display:none;"></div>
+    </button>
+  </div>
+</div>
+
+<!-- MODAL CONFIRMAR CANCELACION -->
+<div class="modal-overlay" id="modalCancelar" style="display:none;" onclick="if(event.target===this)cerrarModalCancelar()">
+  <div class="modal-box" style="max-width:380px;">
+    <div class="modal-title" style="font-size:16px;">Cancelar esta solicitud?</div>
+    <p style="font-size:14px;color:#6B7280;margin-bottom:20px;">Esta accion no se puede deshacer.</p>
+    <div style="display:flex;gap:10px;">
+      <button onclick="cerrarModalCancelar()" style="flex:1;padding:10px;border:1.5px solid #E5E7EB;border-radius:8px;background:#fff;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;">Volver</button>
+      <button onclick="confirmarCancelacion()" style="flex:1;padding:10px;border:none;border-radius:8px;background:#EF4444;color:#fff;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;">Si, cancelar</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/config.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/imagenes.js"></script>
+<script src="../js/notificaciones-ui.js"></script>
+<script src="../js/navbar.js"></script>
+<script>
+const session = getSession();
+if (!session) window.location.href = 'login.html';
+const user = session?.usuario || {};
+let currentMode = 'cliente';
+let _stats = null;
+
+// ── CARGA ESTADÍSTICAS REALES ─────────────────────────
+async function cargarStats() {
+  try {
+    _stats = await Stats.misStats();
+  } catch(e) {
+    _stats = null;
+  }
+  renderStats();
+}
+
+function renderStats() {
+  const s = _stats;
+  const stats = currentMode === 'cliente'
+    ? [
+        {icon:'📋', val: s ? s.solicitudes_activas   : '—', lbl:'Solicitudes activas',   bg:'#EFF6FF', c:'#2563EB'},
+        {icon:'✅', val: s ? s.servicios_completados  : '—', lbl:'Servicios completados', bg:'#F0FDF4', c:'#16A34A'},
+        {icon:'⭐', val: s ? s.calificacion_promedio  : '—', lbl:'Calificacion promedio', bg:'#FEF3C7', c:'#D97706'},
+        {icon:'💬', val: '0',                                lbl:'Mensajes',              bg:'#F5F3FF', c:'#7C3AED'},
+      ]
+    : [
+        {icon:'📤', val: s ? s.postulaciones_enviadas : '—', lbl:'Postulaciones enviadas', bg:'#EFF6FF', c:'#2563EB'},
+        {icon:'✅', val: s ? s.servicios_completados  : '—', lbl:'Trabajos completados',   bg:'#F0FDF4', c:'#16A34A'},
+        {icon:'⭐', val: s ? s.calificacion_promedio  : '—', lbl:'Mi calificacion',        bg:'#FEF3C7', c:'#D97706'},
+        {icon:'👁', val: '0',                                lbl:'Visitas a mi perfil',    bg:'#F5F3FF', c:'#7C3AED'},
+      ];
+
+  document.getElementById('stats-row').innerHTML = stats.map(s=>`
+    <div class="stat-card">
+      <div class="stat-icon" style="background:${s.bg};color:${s.c};">${s.icon}</div>
+      <div><div class="stat-val">${s.val}</div><div class="stat-lbl">${s.lbl}</div></div>
+    </div>`).join('');
+}
+
+// ── INITIALIZE ─────────────────────────────────────
+(async function init() {
+  const av = document.getElementById('nav-avatar');
+  if (user.foto_url) {
+    av.style.backgroundImage    = `url(${user.foto_url})`;
+    av.style.backgroundSize     = 'cover';
+    av.style.backgroundPosition = 'center';
+    av.textContent = '';
+  } else {
+    const ini = ((user.nombre||'U')[0] + (user.apellido||'')[0]).toUpperCase();
+    av.textContent = ini;
+  }
+  document.getElementById('nav-username').textContent = user.nombre || 'Usuario';
+  document.getElementById('drop-name').textContent    = (user.nombre||'') + ' ' + (user.apellido||'');
+  document.getElementById('drop-email').textContent   = user.email || '';
+  document.getElementById('welcome-name').textContent = user.nombre || 'Usuario';
+
+  const verif = user.email_verificado
+    ? '<span class="tag-verificado">Verificado</span>'
+    : '<span class="tag-no-verif" onclick="reenviarVerificacion()" title="Clic para reenviar el correo">Sin verificar — clic aqui</span>';
+  document.getElementById('welcome-sub').innerHTML = `Tu cuenta esta activa ${verif}`;
+
+  await cargarStats();          // carga estadísticas reales
+  cargarMisSolicitudes();
+})();
+
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById('btn-cliente').classList.toggle('active', mode==='cliente');
+  document.getElementById('btn-trabajador').classList.toggle('active', mode==='trabajador');
+  document.getElementById('panel-cliente').style.display    = mode==='cliente'    ? 'block' : 'none';
+  document.getElementById('panel-trabajador').style.display = mode==='trabajador' ? 'block' : 'none';
+  cargarStats();                // actualiza estadísticas al cambiar modo
+  if (mode === 'trabajador') cargarPanelTrabajador();
+}
+
+// ── CLIENTE ─────────────────────────────────────────
+async function cargarMisSolicitudes() {
+  try {
+    const data = await Solicitudes.misSolicitudes();
+    const el = document.getElementById('mis-solicitudes-lista');
+    if (!data.solicitudes.length) {
+      el.innerHTML = '<div class="empty-panel">Aun no tienes solicitudes publicadas.</div>';
+      return;
+    }
+    el.innerHTML = data.solicitudes.slice(0,3).map(s => `
+      <div class="sol-card">
+        <div class="sol-titulo">${s.titulo}</div>
+        <div class="sol-meta">
+          <span>${s.zona||'Sin zona'}</span>
+          <span>${s.categoria_nombre||'General'}</span>
+          <span>${new Date(s.createdat).toLocaleDateString('es')}</span>
+        </div>
+        <span class="sol-estado e-${s.estado}">${s.estado}</span>
+        ${s.estado==='abierta' ? `<button class="btn-cancel-sol" onclick="cancelarSolicitud(${s.id})">Cancelar</button>` : ''}
+      </div>`).join('');
+  } catch(e) {
+    document.getElementById('mis-solicitudes-lista').innerHTML = '<div class="empty-panel">Error al cargar solicitudes.</div>';
+  }
+}
+
+// ── TRABAJADOR ─────────────────────────────────────
+async function cargarPanelTrabajador() {
+  cargarSolicitudesDisponibles();
+  cargarPerfilProfesional();
+  cargarMisTrabajos();
+  cargarMisDocumentos();
+}
+
+async function cargarSolicitudesDisponibles() {
+  try {
+    const data = await Solicitudes.listarAbiertas();
+    const el = document.getElementById('solicitudes-trabajador-lista');
+    if (!data.solicitudes.length) {
+      el.innerHTML = '<div class="empty-panel">No hay solicitudes disponibles.</div>';
+      return;
+    }
+    el.innerHTML = data.solicitudes.slice(0,3).map(s => `
+      <div class="sol-card">
+        <div class="sol-titulo">${s.titulo}</div>
+        <div class="sol-meta">
+          <span>${s.nombre} ${s.apellido||''}</span>
+          <span>${s.zona||'Sin zona'}</span>
+          <span>${s.categoria_nombre||'General'}</span>
+        </div>
+        ${s.presupuesto ? `<span style="font-size:12px;font-weight:700;color:#1D9E75;">$${s.presupuesto}</span>` : ''}
+      </div>`).join('');
+  } catch(e) {
+    document.getElementById('solicitudes-trabajador-lista').innerHTML = '<div class="empty-panel">Error al cargar.</div>';
+  }
+}
+
+async function cargarPerfilProfesional() {
+  try {
+    const sel = document.getElementById('prof-categoria');
+    if (sel.options.length <= 1) {
+      const cats = await Solicitudes.categorias();
+      cats.categorias.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id; opt.textContent = c.nombre;
+        sel.appendChild(opt);
+      });
+    }
+    const data = await Perfil.obtenerProfesional();
+    if (data.perfil) {
+      const p = data.perfil;
+      document.getElementById('prof-titulo').value       = p.titulo || '';
+      document.getElementById('prof-experiencia').value  = p.anos_experiencia || '';
+      document.getElementById('prof-precio').value       = p.precio_desde || '';
+      document.getElementById('prof-descripcion').value  = p.descripcion || '';
+      document.getElementById('prof-disponible').checked = p.disponible !== false;
+      if (p.categoria_id) sel.value = p.categoria_id;
+    }
+  } catch(e) {}
+}
+
+async function guardarPerfilProfesional() {
+  const btn = document.getElementById('btn-guardar-prof');
+  const txt = document.getElementById('btn-prof-text');
+  const sp  = document.getElementById('btn-prof-spinner');
+  btn.disabled=true; txt.style.display='none'; sp.style.display='block';
+  try {
+    await Perfil.actualizarProfesional({
+      titulo:           document.getElementById('prof-titulo').value.trim(),
+      categoria_id:     document.getElementById('prof-categoria').value || null,
+      anos_experiencia: document.getElementById('prof-experiencia').value || 0,
+      precio_desde:     document.getElementById('prof-precio').value || null,
+      descripcion:      document.getElementById('prof-descripcion').value.trim(),
+      disponible:       document.getElementById('prof-disponible').checked,
+    });
+    showAlert('Perfil profesional guardado correctamente.', 'success', 'alert-prof');
+  } catch(e) {
+    showAlert(e.message, 'error', 'alert-prof');
+  } finally {
+    btn.disabled=false; txt.style.display='inline'; sp.style.display='none';
+  }
+}
+
+async function cargarMisTrabajos() {
+  try {
+    const data = await Trabajos.misTrabajos();
+    const el = document.getElementById('mis-trabajos-grid');
+    if (!data.trabajos.length) {
+      el.innerHTML = '<div class="empty-panel" style="grid-column:1/-1;">Aun no has subido trabajos.</div>';
+      return;
+    }
+    el.innerHTML = data.trabajos.map(t => `
+      <div class="trab-card">
+        <img src="${t.url_imagen}" alt="Trabajo">
+        <button class="btn-del" onclick="eliminarTrabajo(${t.id})" title="Eliminar">X</button>
+        ${t.descripcion ? `<div class="trab-desc">${t.descripcion}</div>` : ''}
+      </div>`).join('');
+  } catch(e) {
+    document.getElementById('mis-trabajos-grid').innerHTML = '<div class="empty-panel" style="grid-column:1/-1;">Error al cargar.</div>';
+  }
+}
+
+async function subirTrabajo() {
+  const input = document.getElementById('input-imagen-trabajo');
+  const file  = input.files[0];
+  if (!file) return;
+  const desc = document.getElementById('input-desc-trabajo').value.trim();
+  const fd = new FormData();
+  fd.append('imagen', file);
+  if (desc) fd.append('descripcion', desc);
+  try {
+    await Trabajos.subir(fd);
+    showAlert('Imagen subida correctamente.', 'success', 'alert-trab');
+    input.value = '';
+    document.getElementById('input-desc-trabajo').value = '';
+    cargarMisTrabajos();
+  } catch(e) {
+    showAlert(e.message, 'error', 'alert-trab');
+  }
+}
+
+async function eliminarTrabajo(id) {
+  try {
+    await Trabajos.eliminar(id);
+    cargarMisTrabajos();
+  } catch(e) {
+    showAlert(e.message, 'error', 'alert-trab');
+  }
+}
+
+async function cargarMisDocumentos() {
+  try {
+    const data = await Perfil.misVerificaciones();
+    const el = document.getElementById('mis-docs-lista');
+    if (!data.verificaciones.length) {
+      el.innerHTML = '<div class="empty-panel">No has subido documentos aun.</div>';
+      return;
+    }
+    el.innerHTML = data.verificaciones.map(v => `
+      <div class="doc-item">
+        <img src="${v.doc_url}" alt="Documento" onerror="this.src='https://via.placeholder.com/48x48?text=PDF'">
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:600;">Documento</div>
+          <div style="font-size:11px;color:#6B7280;">${new Date(v.createdat).toLocaleDateString('es')}</div>
+          ${v.motivo_rechazo ? `<div style="font-size:11px;color:#EF4444;">Motivo: ${v.motivo_rechazo}</div>` : ''}
+        </div>
+        <span class="doc-badge doc-${v.estado}">${v.estado}</span>
+      </div>`).join('');
+  } catch(e) {
+    document.getElementById('mis-docs-lista').innerHTML = '<div class="empty-panel">Error al cargar documentos.</div>';
+  }
+}
+
+async function subirDocumento() {
+  const input = document.getElementById('input-documento');
+  const file  = input.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('documento', file);
+  try {
+    await Perfil.subirVerificacion(fd);
+    showAlert('Documento enviado para revision.', 'success', 'alert-doc');
+    input.value = '';
+    cargarMisDocumentos();
+  } catch(e) {
+    showAlert(e.message, 'error', 'alert-doc');
+  }
+}
+
+// ── MODAL SOLICITUD ────────────────────────────────
+async function abrirModalSolicitud() {
+  document.getElementById('modalSolicitud').style.display = 'flex';
+  const sel = document.getElementById('sol-categoria');
+  if (sel.options.length <= 1) {
+    try {
+      const data = await Solicitudes.categorias();
+      data.categorias.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id; opt.textContent = c.nombre;
+        sel.appendChild(opt);
+      });
+    } catch(e) {}
+  }
+}
+
+function cerrarModalSolicitud() {
+  document.getElementById('modalSolicitud').style.display = 'none';
+}
+
+async function publicarSolicitud() {
+  const titulo = document.getElementById('sol-titulo').value.trim();
+  if (!titulo) { showAlert('El titulo es obligatorio.','error','alert-sol'); return; }
+  const btn = document.getElementById('btn-publicar');
+  const txt = document.getElementById('btn-publicar-text');
+  const sp  = document.getElementById('btn-publicar-spinner');
+  btn.disabled=true; txt.style.display='none'; sp.style.display='block';
+  try {
+    await Solicitudes.crear({
+      titulo,
+      categoria_id:    document.getElementById('sol-categoria').value || null,
+      descripcion:     document.getElementById('sol-descripcion').value,
+      zona:            document.getElementById('sol-zona').value,
+      presupuesto:     document.getElementById('sol-presupuesto').value || null,
+      fecha_preferida: document.getElementById('sol-fecha').value || null,
+      urgencia:        document.getElementById('sol-urgencia').value,
+    });
+    cerrarModalSolicitud();
+    showAlert('Solicitud publicada correctamente','success');
+    cargarMisSolicitudes();
+    await cargarStats();           // ← actualiza estadísticas después de publicar
+  } catch(err) {
+    showAlert(err.message,'error','alert-sol');
+  } finally {
+    btn.disabled=false; txt.style.display='inline'; sp.style.display='none';
+  }
+}
+
+// ── CANCELAR SOLICITUD ─────────────────────────────
+let _cancelarId = null;
+
+function cancelarSolicitud(id) {
+  _cancelarId = id;
+  document.getElementById('modalCancelar').style.display = 'flex';
+}
+
+function cerrarModalCancelar() {
+  _cancelarId = null;
+  document.getElementById('modalCancelar').style.display = 'none';
+}
+
+async function confirmarCancelacion() {
+  const id = _cancelarId;
+  if (!id) return;
+  cerrarModalCancelar();
+  try {
+    await Solicitudes.cancelar(id);
+    showAlert('Solicitud cancelada.', 'success');
+    cargarMisSolicitudes();
+    await cargarStats();           // ← actualiza estadísticas después de cancelar
+  } catch(e) { showAlert(e.message, 'error'); }
+}
+
+// ── SEGURIDAD ──────────────────────────────────────
+function toggleChangePass() {
+  const f = document.getElementById('change-pass-form');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+
+async function handleChangePass() {
+  const passwordActual    = document.getElementById('pass-actual').value;
+  const nuevaPassword     = document.getElementById('pass-nueva').value;
+  const confirmarPassword = document.getElementById('pass-confirmar').value;
+  if (!passwordActual||!nuevaPassword) { showAlert('Completa todos los campos.','error','alert-pass'); return; }
+  if (nuevaPassword.length < 8)        { showAlert('Minimo 8 caracteres.','error','alert-pass'); return; }
+  if (nuevaPassword !== confirmarPassword){ showAlert('Las contrasenas no coinciden.','error','alert-pass'); return; }
+  setLoading(true);
+  try {
+    await Auth.changePassword({ passwordActual, nuevaPassword, confirmarPassword });
+    setLoading(false);
+    showAlert('Contrasena actualizada','success','alert-pass');
+    document.getElementById('pass-actual').value='';
+    document.getElementById('pass-nueva').value='';
+    document.getElementById('pass-confirmar').value='';
+  } catch(err) { setLoading(false); showAlert(err.message,'error','alert-pass'); }
+}
+
+// ── REENVIAR VERIFICACION ──────────────────────────
+async function reenviarVerificacion() {
+  const email = user.email;
+  if (!email) return;
+  try {
+    await Auth.resendVerification(email);
+    showAlert('Correo de verificacion enviado. Revisa tu bandeja.', 'success');
+  } catch(e) {
+    showAlert('Error al enviar: ' + e.message, 'error');
+  }
+}
+
+// ── FUNCIONES AUXILIARES (por si no existen en api.js) ──
+if (typeof showAlert !== 'function') {
+  window.showAlert = function(msg, type, containerId = 'alert-box') {
+    const container = document.getElementById(containerId);
+    if (container) {
+      container.textContent = msg;
+      container.className = `alert-box alert-${type}`;
+      container.style.display = 'block';
+      setTimeout(() => { container.style.display = 'none'; }, 5000);
+    } else {
+      alert(msg);
+    }
+  };
+}
+if (typeof setLoading !== 'function') {
+  window.setLoading = function(isLoading) {
+    const btn = document.getElementById('submit-btn');
+    if (btn) btn.disabled = isLoading;
+  };
+}
+if (typeof checkPasswordStrength !== 'function') {
+  window.checkPasswordStrength = function(pwd) {
+    const strengthDiv = document.getElementById('pass-strength');
+    if (strengthDiv) strengthDiv.style.display = pwd ? 'flex' : 'none';
+  };
+}
+if (typeof toggleUserMenu !== 'function') {
+  window.toggleUserMenu = function() {
+    const d = document.getElementById('userDropdown');
+    if (d) d.style.display = d.style.display === 'none' ? 'flex' : 'none';
+  };
+}
+if (typeof logout !== 'function') {
+  window.logout = function() {
+    localStorage.removeItem('session');
+    window.location.href = 'login.html';
+  };
+}
+</script>
+</body>
+</html>

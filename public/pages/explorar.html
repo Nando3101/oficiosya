@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Explorar profesionales — OficiosYA</title>
+  <link rel="stylesheet" href="../css/main.css">
+
+  <style>
+    body {
+      margin: 0;
+      background: #f3f4f6;
+      font-family: Arial, sans-serif;
+      color: #111827;
+    }
+
+    .topbar {
+      background: #169b70;
+      color: white;
+      min-height: 70px;
+      display: flex;
+      align-items: center;
+      padding: 0 40px;
+      gap: 30px;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 900;
+      font-size: 24px;
+      text-decoration: none;
+      color: white;
+    }
+
+    .brand span {
+      color: #f59e0b;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .nav-links a {
+      color: white;
+      text-decoration: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-weight: 700;
+    }
+
+    .nav-links a.active,
+    .nav-links a:hover {
+      background: rgba(255,255,255,.15);
+    }
+
+    .auth-links {
+      margin-left: auto;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .auth-links a {
+      color: white;
+      text-decoration: none;
+      font-weight: 800;
+      padding: 10px 16px;
+      border-radius: 8px;
+    }
+
+    .auth-links .login {
+      border: 1px solid rgba(255,255,255,.45);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      min-height: calc(100vh - 70px);
+    }
+
+    .sidebar {
+      background: white;
+      padding: 28px;
+      border-right: 1px solid #e5e7eb;
+    }
+
+    .filter-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .filter-title h3 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .filter-title button {
+      border: none;
+      background: none;
+      color: #169b70;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .filter-group {
+      margin-bottom: 28px;
+    }
+
+    .filter-group h4 {
+      color: #9ca3af;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      margin-bottom: 14px;
+    }
+
+    .radio-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 12px 0;
+      color: #374151;
+      cursor: pointer;
+    }
+
+    .radio-row input {
+      accent-color: #169b70;
+    }
+
+    .main {
+      padding: 34px;
+    }
+
+    .main-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .main-head h1 {
+      margin: 0;
+      font-size: 32px;
+    }
+
+    .main-head p {
+      margin: 6px 0 0;
+      color: #6b7280;
+      font-size: 17px;
+    }
+
+    .search-box {
+      width: 330px;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 13px 16px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .search-box input {
+      border: none;
+      outline: none;
+      width: 100%;
+      font-size: 15px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(260px, 1fr));
+      gap: 22px;
+    }
+
+    .card {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.03);
+    }
+
+    .card-top {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    .avatar {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #6b7280;
+      font-weight: 900;
+      font-size: 19px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .name {
+      font-size: 18px;
+      font-weight: 900;
+      margin-bottom: 4px;
+    }
+
+    .category {
+      color: #169b70;
+      font-weight: 800;
+      font-size: 14px;
+    }
+
+    .meta {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      color: #6b7280;
+      font-size: 14px;
+      margin: 14px 0;
+    }
+
+    .available {
+      background: #d1fae5;
+      color: #065f46;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 800;
+      margin-bottom: 16px;
+    }
+
+    .busy {
+      background: #fee2e2;
+      color: #991b1b;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 800;
+      margin-bottom: 16px;
+    }
+
+    .btn-ver {
+      width: 100%;
+      border: none;
+      background: #169b70;
+      color: white;
+      padding: 13px;
+      border-radius: 9px;
+      font-weight: 900;
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    .btn-ver:hover {
+      background: #0f7d59;
+    }
+
+    .empty {
+      background: white;
+      border-radius: 14px;
+      padding: 30px;
+      color: #6b7280;
+      text-align: center;
+      border: 1px solid #e5e7eb;
+    }
+
+    .error {
+      background: #fee2e2;
+      color: #991b1b;
+      padding: 16px;
+      border-radius: 12px;
+      font-weight: bold;
+    }
+
+    @media(max-width: 1100px) {
+      .grid {
+        grid-template-columns: repeat(2, minmax(260px, 1fr));
+      }
+    }
+
+    @media(max-width: 800px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        border-right: none;
+        border-bottom: 1px solid #e5e7eb;
+      }
+
+      .main-head {
+        flex-direction: column;
+      }
+
+      .search-box {
+        width: 100%;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .topbar {
+        padding: 12px 16px;
+        gap: 12px;
+      }
+
+      .auth-links {
+        margin-left: 0;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<header class="topbar">
+  <a href="../index.html" class="brand">
+    Oficios<span>YA</span>
+  </a>
+
+  <nav class="nav-links">
+    <a href="../index.html">Inicio</a>
+    <a href="explorar.html" class="active">Explorar</a>
+    <a href="solicitudes.html">Solicitudes</a>
+    <a href="dashboard.html">Mi Panel</a>
+  </nav>
+
+  <div class="auth-links">
+    <a href="login.html" class="login">Iniciar sesión</a>
+    <a href="registro.html">Registrarse</a>
+  </div>
+</header>
+
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="filter-title">
+      <h3>Filtros</h3>
+      <button onclick="limpiarFiltros()">Limpiar</button>
+    </div>
+
+    <div class="filter-group">
+      <h4>Categoría</h4>
+      <label class="radio-row">
+        <input type="radio" name="categoria" value="todas" checked onchange="aplicarFiltros()">
+        Todas
+      </label>
+
+      <div id="filtros-categorias"></div>
+    </div>
+
+    <div class="filter-group">
+      <h4>Disponibilidad</h4>
+      <label class="radio-row">
+        <input type="radio" name="disponibilidad" value="todas" checked onchange="aplicarFiltros()">
+        Todas
+      </label>
+
+      <label class="radio-row">
+        <input type="radio" name="disponibilidad" value="disponible" onchange="aplicarFiltros()">
+        Disponibles
+      </label>
+
+      <label class="radio-row">
+        <input type="radio" name="disponibilidad" value="ocupado" onchange="aplicarFiltros()">
+        Ocupados
+      </label>
+    </div>
+
+    <div class="filter-group">
+      <h4>Zona</h4>
+
+      <label class="radio-row">
+        <input type="radio" name="zona" value="todas" checked onchange="aplicarFiltros()">
+        Todas
+      </label>
+
+      <label class="radio-row">
+        <input type="radio" name="zona" value="centro" onchange="aplicarFiltros()">
+        Centro
+      </label>
+
+      <label class="radio-row">
+        <input type="radio" name="zona" value="norte" onchange="aplicarFiltros()">
+        Norte
+      </label>
+
+      <label class="radio-row">
+        <input type="radio" name="zona" value="sur" onchange="aplicarFiltros()">
+        Sur
+      </label>
+
+      <label class="radio-row">
+        <input type="radio" name="zona" value="este" onchange="aplicarFiltros()">
+        Este
+      </label>
+
+      <label class="radio-row">
+        <input type="radio" name="zona" value="oeste" onchange="aplicarFiltros()">
+        Oeste
+      </label>
+
+      <label class="radio-row">
+        <input type="radio" name="zona" value="ambato" onchange="aplicarFiltros()">
+        Ambato
+      </label>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="main-head">
+      <div>
+        <h1>Explorar profesionales</h1>
+        <p id="contador">Cargando profesionales...</p>
+      </div>
+
+      <div class="search-box">
+        🔍
+        <input type="text" id="buscar" placeholder="Buscar por nombre o especialidad" oninput="aplicarFiltros()">
+      </div>
+    </div>
+
+    <div id="contenido-profesionales" class="grid"></div>
+  </main>
+
+</div>
+
+<script src="../js/config.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/imagenes.js"></script>
+<script src="../js/navbar.js"></script>
+
+<script>
+let profesionales = [];
+let profesionalesFiltrados = [];
+
+function textoSeguro(valor) {
+  return String(valor || '').trim();
+}
+
+function normalizarTexto(valor) {
+  return textoSeguro(valor).toLowerCase();
+}
+
+function obtenerIniciales(trabajador) {
+  const nombres = trabajador.nombres || trabajador.nombre || '';
+  const apellidos = trabajador.apellidos || '';
+
+  const inicialN = nombres.charAt(0).toUpperCase();
+  const inicialA = apellidos.charAt(0).toUpperCase();
+
+  const iniciales = `${inicialN}${inicialA}`.trim();
+
+  return iniciales || 'U';
+}
+
+function obtenerIdTrabajador(trabajador) {
+  const id =
+    trabajador.usuario_id ||
+    trabajador.id_usuario ||
+    trabajador.trabajador_id ||
+    trabajador.usuarioId ||
+    trabajador.user_id ||
+    trabajador.id;
+
+  if (!id || id === 'null' || id === 'undefined') {
+    return null;
+  }
+
+  const numero = Number(id);
+
+  return isNaN(numero) ? null : numero;
+}
+
+function obtenerNombreCompleto(trabajador) {
+  const nombres = trabajador.nombres || trabajador.nombre || '';
+  const apellidos = trabajador.apellidos || '';
+
+  return `${nombres} ${apellidos}`.trim() || 'Usuario';
+}
+
+function obtenerCategoria(trabajador) {
+  return trabajador.categoria ||
+         trabajador.nombre_categoria ||
+         trabajador.especialidad ||
+         'Sin categoría';
+}
+
+function obtenerZona(trabajador) {
+  return trabajador.zona ||
+         trabajador.ciudad ||
+         'Sin zona';
+}
+
+function obtenerTarifa(trabajador) {
+  return trabajador.tarifa_referencia ||
+         trabajador.tarifa ||
+         trabajador.precio_desde ||
+         trabajador.precio ||
+         null;
+}
+
+function estaDisponible(trabajador) {
+  const disponibilidad = normalizarTexto(trabajador.disponibilidad);
+  const estadoConexion = normalizarTexto(trabajador.estado_conexion);
+  const estado = normalizarTexto(trabajador.estado);
+
+  if (
+    disponibilidad.includes('ocupado') ||
+    estadoConexion.includes('ocupado') ||
+    estadoConexion.includes('trabajando') ||
+    estado === 'ocupado'
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function obtenerTextoDisponibilidad(trabajador) {
+  return estaDisponible(trabajador) ? '🟢 Disponible' : '🔴 Ocupado';
+}
+
+function obtenerClaseDisponibilidad(trabajador) {
+  return estaDisponible(trabajador) ? 'available' : 'busy';
+}
+
+function pintarCategorias() {
+  const contenedor = document.getElementById('filtros-categorias');
+
+  if (!contenedor) return;
+
+  const nombresCategorias = [...new Set(
+    profesionales
+      .map(p => obtenerCategoria(p))
+      .filter(c => c && c !== 'Sin categoría')
+  )];
+
+  contenedor.innerHTML = nombresCategorias.map(cat => `
+    <label class="radio-row">
+      <input type="radio" name="categoria" value="${cat}" onchange="aplicarFiltros()">
+      ${cat}
+    </label>
+  `).join('');
+}
+
+function obtenerFiltro(nombre) {
+  const seleccionado = document.querySelector(`input[name="${nombre}"]:checked`);
+  return seleccionado ? seleccionado.value : 'todas';
+}
+
+function aplicarFiltros() {
+  const busqueda = normalizarTexto(document.getElementById('buscar')?.value || '');
+  const categoriaFiltro = normalizarTexto(obtenerFiltro('categoria'));
+  const disponibilidadFiltro = normalizarTexto(obtenerFiltro('disponibilidad'));
+  const zonaFiltro = normalizarTexto(obtenerFiltro('zona'));
+
+  profesionalesFiltrados = profesionales.filter((trabajador) => {
+    const nombre = normalizarTexto(obtenerNombreCompleto(trabajador));
+    const categoria = normalizarTexto(obtenerCategoria(trabajador));
+    const zona = normalizarTexto(obtenerZona(trabajador));
+    const disponible = estaDisponible(trabajador);
+
+    const coincideBusqueda =
+      !busqueda ||
+      nombre.includes(busqueda) ||
+      categoria.includes(busqueda) ||
+      zona.includes(busqueda);
+
+    const coincideCategoria =
+      categoriaFiltro === 'todas' ||
+      categoria === categoriaFiltro;
+
+    const coincideDisponibilidad =
+      disponibilidadFiltro === 'todas' ||
+      (disponibilidadFiltro === 'disponible' && disponible) ||
+      (disponibilidadFiltro === 'ocupado' && !disponible);
+
+    const coincideZona =
+      zonaFiltro === 'todas' ||
+      zona.includes(zonaFiltro);
+
+    return coincideBusqueda && coincideCategoria && coincideDisponibilidad && coincideZona;
+  });
+
+  pintarProfesionales();
+}
+
+function pintarProfesionales() {
+  const contenedor = document.getElementById('contenido-profesionales');
+  const contador = document.getElementById('contador');
+
+  contador.textContent = `${profesionalesFiltrados.length} profesionales encontrados`;
+
+  if (profesionalesFiltrados.length === 0) {
+    contenedor.className = '';
+    contenedor.innerHTML = `
+      <div class="empty">
+        No se encontraron profesionales con esos filtros.
+      </div>
+    `;
+    return;
+  }
+
+  contenedor.className = 'grid';
+
+  contenedor.innerHTML = profesionalesFiltrados.map((trabajador) => {
+    const idTrabajador = obtenerIdTrabajador(trabajador);
+    const nombre = obtenerNombreCompleto(trabajador);
+    const categoria = obtenerCategoria(trabajador);
+    const zona = obtenerZona(trabajador);
+    const tarifa = obtenerTarifa(trabajador);
+    const iniciales = obtenerIniciales(trabajador);
+
+    let foto = '../img/default-user.png';
+
+    if (typeof imagenUsuario === 'function') {
+      foto = imagenUsuario(trabajador);
+    }
+
+    return `
+      <div class="card">
+        <div class="card-top">
+          <div class="avatar">
+            ${
+              foto && !foto.includes('default-user.png')
+                ? `<img src="${foto}" loading="lazy" alt="Foto de ${nombre}" onerror="this.parentElement.textContent='${iniciales}'">`
+                : iniciales
+            }
+          </div>
+
+          <div>
+            <div class="name">${nombre}</div>
+            <div class="category">${categoria}</div>
+          </div>
+        </div>
+
+        <div class="meta">
+          <span>📍 ${zona}</span>
+          <span>💰 ${tarifa ? 'Desde $' + tarifa : 'Sin tarifa'}</span>
+        </div>
+
+        <div class="${obtenerClaseDisponibilidad(trabajador)}">
+          ${obtenerTextoDisponibilidad(trabajador)}
+        </div>
+
+        <button class="btn-ver" onclick="verPerfil(${idTrabajador})">
+          Ver perfil
+        </button>
+      </div>
+    `;
+  }).join('');
+}
+
+function verPerfil(id) {
+  console.log('ID enviado a ver-perfil:', id);
+
+  if (!id || id === 'null' || id === 'undefined' || isNaN(Number(id))) {
+    alert('No se encontró el ID del trabajador.');
+    return;
+  }
+
+  window.location.href = `ver-perfil.html?id=${Number(id)}`;
+}
+
+function limpiarFiltros() {
+  document.getElementById('buscar').value = '';
+
+  const categoriaTodas = document.querySelector('input[name="categoria"][value="todas"]');
+  const disponibilidadTodas = document.querySelector('input[name="disponibilidad"][value="todas"]');
+  const zonaTodas = document.querySelector('input[name="zona"][value="todas"]');
+
+  if (categoriaTodas) categoriaTodas.checked = true;
+  if (disponibilidadTodas) disponibilidadTodas.checked = true;
+  if (zonaTodas) zonaTodas.checked = true;
+
+  aplicarFiltros();
+}
+
+async function cargarProfesionales() {
+  const contenedor = document.getElementById('contenido-profesionales');
+  const contador = document.getElementById('contador');
+
+  try {
+    contenedor.innerHTML = `
+      <div class="empty">
+        Cargando profesionales...
+      </div>
+    `;
+
+    let data = await Trabajadores.profesionales();
+
+    if (!Array.isArray(data)) {
+      data = data.profesionales || data.trabajadores || data.usuarios || [];
+    }
+
+    console.log('Profesionales recibidos:', data);
+
+    profesionales = data
+      .map((t) => {
+        const idReal = obtenerIdTrabajador(t);
+
+        return {
+          ...t,
+          id: idReal,
+          usuario_id: t.usuario_id || t.id_usuario || t.trabajador_id || idReal
+        };
+      })
+      .filter(t => obtenerIdTrabajador(t));
+
+    profesionalesFiltrados = [...profesionales];
+
+    pintarCategorias();
+    pintarProfesionales();
+
+  } catch (error) {
+    console.error('Error al cargar profesionales:', error);
+
+    contador.textContent = 'No se pudieron cargar los profesionales';
+
+    contenedor.className = '';
+    contenedor.innerHTML = `
+      <div class="error">
+        Error al cargar profesionales: ${error.message}
+      </div>
+    `;
+  }
+}
+
+cargarProfesionales();
+</script>
+
+</body>
+</html>

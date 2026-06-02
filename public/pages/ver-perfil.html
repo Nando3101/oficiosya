@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ver perfil — OficiosYA</title>
+  <link rel="stylesheet" href="../css/main.css">
+
+  <style>
+    body {
+      margin: 0;
+      background: #f3f4f6;
+      font-family: Arial, sans-serif;
+      color: #111827;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 30px 20px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 18px;
+      padding: 26px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.08);
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .foto {
+      width: 135px;
+      height: 135px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 4px solid #1D9E75;
+      background: #e5e7eb;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 30px;
+    }
+
+    .muted {
+      color: #6b7280;
+      margin: 5px 0;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #d1fae5;
+      color: #065f46;
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 6px;
+    }
+
+    .section {
+      margin-top: 24px;
+      border-top: 1px solid #e5e7eb;
+      padding-top: 18px;
+    }
+
+    .section h3 {
+      margin: 0 0 8px;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 22px;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 10px;
+      padding: 11px 16px;
+      font-weight: bold;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+    }
+
+    .btn-green {
+      background: #1D9E75;
+      color: white;
+    }
+
+    .btn-dark {
+      background: #111827;
+      color: white;
+    }
+
+    .btn-light {
+      background: #e5e7eb;
+      color: #111827;
+    }
+
+    .error {
+      background: #fee2e2;
+      color: #991b1b;
+      padding: 14px;
+      border-radius: 12px;
+      font-weight: bold;
+      margin-bottom: 14px;
+    }
+
+    @media(max-width: 700px) {
+      .header {
+        flex-direction: column;
+        text-align: center;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+  <div id="contenido" class="card">
+    Cargando perfil...
+  </div>
+</div>
+
+<script src="../js/config.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/imagenes.js"></script>
+<script src="../js/navbar.js"></script>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const usuarioId = params.get('id');
+
+function limpiarTelefono(tel) {
+  return String(tel || '').replace(/\D/g, '');
+}
+
+function abrirWhatsapp(telefono, nombre) {
+  const tel = limpiarTelefono(telefono);
+
+  if (!tel) {
+    alert('Este trabajador no tiene teléfono registrado.');
+    return;
+  }
+
+  const numero = tel.startsWith('593') ? tel : `593${tel.replace(/^0/, '')}`;
+  const mensaje = encodeURIComponent(`Hola ${nombre}, te contacto desde OficiosYA.`);
+
+  window.open(`https://wa.me/${numero}?text=${mensaje}`, '_blank');
+}
+
+function abrirMapa(zona) {
+  if (!zona) {
+    alert('Este usuario no tiene zona registrada.');
+    return;
+  }
+
+  const busqueda = encodeURIComponent(`${zona}, Ambato, Ecuador`);
+  window.open(`https://www.google.com/maps/search/?api=1&query=${busqueda}`, '_blank');
+}
+
+async function cargarPerfilPublico() {
+  const contenedor = document.getElementById('contenido');
+
+  if (!usuarioId || usuarioId === 'undefined' || usuarioId === 'null') {
+    contenedor.innerHTML = `
+      <div class="error">No se recibió un ID válido del perfil.</div>
+      <button class="btn btn-dark" onclick="volver()">Volver</button>
+    `;
+    return;
+  }
+
+  try {
+    const perfil = await Perfil.publico(usuarioId);
+
+    const nombreCompleto = `${perfil.nombres || ''} ${perfil.apellidos || ''}`.trim() || 'Usuario';
+
+    contenedor.innerHTML = `
+      <div class="header">
+        <img class="foto" src="${imagenUsuario(perfil)}" loading="lazy" alt="Foto de usuario">
+
+        <div>
+          <h1>${nombreCompleto}</h1>
+          <p class="muted">${perfil.email || 'Sin correo registrado'}</p>
+          <p class="muted">Teléfono: ${perfil.telefono || 'Sin teléfono registrado'}</p>
+          <p class="muted">Zona: ${perfil.zona || 'Sin zona registrada'}</p>
+          <span class="badge">${perfil.verificado ? 'Verificado' : 'No verificado'}</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>Categoría</h3>
+        <p>${perfil.categoria || 'Sin categoría registrada'}</p>
+      </div>
+
+      <div class="section">
+        <h3>Descripción</h3>
+        <p>${perfil.descripcion || 'Este usuario aún no ha agregado una descripción.'}</p>
+      </div>
+
+      <div class="section">
+        <h3>Experiencia</h3>
+        <p>${perfil.experiencia || 'Sin experiencia registrada.'}</p>
+      </div>
+
+      <div class="section">
+        <h3>Tarifa referencial</h3>
+        <p>${perfil.tarifa_referencia ? '$' + perfil.tarifa_referencia : 'No especificada'}</p>
+      </div>
+
+      <div class="section">
+        <h3>Disponibilidad</h3>
+        <p>${perfil.disponibilidad || 'No especificada'}</p>
+      </div>
+
+      <div class="section">
+        <h3>Calificación</h3>
+        <p>⭐ ${Number(perfil.promedio_calificacion || 0).toFixed(1)} / 5</p>
+        <p class="muted">${perfil.total_calificaciones || 0} calificaciones recibidas</p>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-green" onclick="abrirWhatsapp('${perfil.telefono || ''}', '${nombreCompleto}')">
+          Contactar por WhatsApp
+        </button>
+
+        <button class="btn btn-light" onclick="abrirMapa('${perfil.zona || ''}')">
+          Ver zona en mapa
+        </button>
+
+        <button class="btn btn-dark" onclick="volver()">
+          Volver
+        </button>
+      </div>
+    `;
+
+  } catch (error) {
+    console.error('Error al cargar perfil:', error);
+
+    contenedor.innerHTML = `
+      <div class="error">
+        ${error.message || 'Error al cargar perfil público.'}
+      </div>
+      <button class="btn btn-dark" onclick="volver()">Volver</button>
+    `;
+  }
+}
+
+function volver() {
+  window.location.href = 'explorar.html';
+}
+
+cargarPerfilPublico();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Solicitudes — OficiosYA</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link rel="stylesheet" href="../css/main.css">
+
+  <style>
+    body {
+      margin: 0;
+      background: #f3f4f6;
+      font-family: Arial, sans-serif;
+      color: #111827;
+    }
+
+    .topbar {
+      background: #169b70;
+      color: white;
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .brand {
+      font-size: 24px;
+      font-weight: 900;
+      color: white;
+      text-decoration: none;
+    }
+
+    .brand span {
+      color: #f59e0b;
+    }
+
+    .nav {
+      display: flex;
+      gap: 12px;
+    }
+
+    .nav a {
+      color: white;
+      text-decoration: none;
+      font-weight: bold;
+      padding: 8px 12px;
+      border-radius: 8px;
+    }
+
+    .nav a:hover,
+    .nav a.active {
+      background: rgba(255,255,255,.16);
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 28px 20px;
+    }
+
+    .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 30px;
+    }
+
+    .muted {
+      color: #6b7280;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .tab {
+      border: none;
+      padding: 11px 16px;
+      border-radius: 10px;
+      background: white;
+      color: #111827;
+      font-weight: bold;
+      cursor: pointer;
+      border: 1px solid #e5e7eb;
+    }
+
+    .tab.active {
+      background: #169b70;
+      color: white;
+    }
+
+    .grid {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .card {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 18px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 18px;
+      align-items: center;
+    }
+
+    .title {
+      font-size: 18px;
+      font-weight: 900;
+      margin-bottom: 6px;
+    }
+
+    .desc {
+      color: #4b5563;
+      margin-bottom: 10px;
+    }
+
+    .meta {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    .estado {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: bold;
+      background: #d1fae5;
+      color: #065f46;
+      margin-bottom: 8px;
+    }
+
+    .estado.cancelada {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .estado.finalizada {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
+    .estado.en_curso {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      max-width: 520px;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 9px;
+      padding: 9px 12px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .btn-green {
+      background: #169b70;
+      color: white;
+    }
+
+    .btn-dark {
+      background: #111827;
+      color: white;
+    }
+
+    .btn-blue {
+      background: #2563eb;
+      color: white;
+    }
+
+    .btn-orange {
+      background: #f59e0b;
+      color: #111827;
+    }
+
+    .btn-red {
+      background: #ef4444;
+      color: white;
+    }
+
+    .btn-light {
+      background: #e5e7eb;
+      color: #111827;
+    }
+
+    .empty,
+    .error {
+      background: white;
+      border-radius: 14px;
+      padding: 24px;
+      text-align: center;
+      color: #6b7280;
+      border: 1px solid #e5e7eb;
+    }
+
+    .error {
+      color: #991b1b;
+      background: #fee2e2;
+      font-weight: bold;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      padding: 18px;
+    }
+
+    .modal-content {
+      background: white;
+      border-radius: 16px;
+      padding: 22px;
+      width: 100%;
+      max-width: 480px;
+    }
+
+    .modal-content h3 {
+      margin-top: 0;
+    }
+
+    .form-group {
+      margin-bottom: 12px;
+    }
+
+    .form-group label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 6px;
+    }
+
+    .form-group input,
+    .form-group textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 11px;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 14px;
+    }
+
+    @media(max-width: 800px) {
+      .card {
+        grid-template-columns: 1fr;
+      }
+
+      .actions {
+        justify-content: flex-start;
+      }
+
+      .topbar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<header class="topbar">
+  <a href="../index.html" class="brand">Oficios<span>YA</span></a>
+
+  <nav class="nav">
+    <a href="../index.html">Inicio</a>
+    <a href="explorar.html">Explorar</a>
+    <a href="solicitudes.html" class="active">Solicitudes</a>
+    <a href="dashboard.html">Mi Panel</a>
+  </nav>
+</header>
+
+<div class="container">
+  <div class="head">
+    <div>
+      <h1>Solicitudes de servicio</h1>
+      <div class="muted" id="contador">Cargando solicitudes...</div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" id="tab-abiertas" onclick="cambiarTab('abiertas')">Todas abiertas</button>
+    <button class="tab" id="tab-mias" onclick="cambiarTab('mias')">Mis solicitudes</button>
+  </div>
+
+  <div id="lista" class="grid"></div>
+</div>
+
+<div class="modal" id="modalPostular">
+  <div class="modal-content">
+    <h3>Postularme a solicitud</h3>
+
+    <div class="form-group">
+      <label>Mensaje</label>
+      <textarea id="post-mensaje" rows="3" placeholder="Escribe un mensaje para el cliente..."></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>Precio ofertado</label>
+      <input type="number" id="post-precio" step="0.01" min="0" placeholder="Ej: 20">
+    </div>
+
+    <div class="form-group">
+      <label>Disponibilidad</label>
+      <input type="text" id="post-disponibilidad" placeholder="Ej: Hoy en la tarde">
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-light" onclick="cerrarPostular()">Cancelar</button>
+      <button class="btn btn-green" onclick="enviarPostulacion()">Enviar postulación</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/config.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/ubicacion-trabajador.js"></script>
+<script src="../js/notificaciones-ui.js"></script>
+<script>
+const sesion = getSession();
+const usuario = getUsuario();
+
+let tabActual = 'abiertas';
+let solicitudes = [];
+let solicitudPostularId = null;
+
+if (!sesion || !sesion.usuario) {
+  console.warn('Usuario no logueado. Algunas funciones no estarán disponibles.');
+}
+
+function esPropietario(s) {
+  if (!usuario) return false;
+  return Number(s.cliente_id) === Number(usuario.id);
+}
+
+function esTrabajadorAsignado(s) {
+  if (!usuario) return false;
+  return Number(s.trabajador_id) === Number(usuario.id);
+}
+
+function tieneTrabajador(s) {
+  return !!s.trabajador_id;
+}
+
+function estadoClase(estado) {
+  const e = String(estado || '').toLowerCase();
+
+  if (e === 'cancelada') return 'estado cancelada';
+  if (e === 'finalizada') return 'estado finalizada';
+  if (e === 'en_curso') return 'estado en_curso';
+
+  return 'estado';
+}
+
+function textoEstado(estado) {
+  const mapa = {
+    abierta: 'Abierta',
+    confirmada: 'Confirmada',
+    en_curso: 'En curso',
+    finalizada: 'Finalizada',
+    cancelada: 'Cancelada'
+  };
+
+  return mapa[estado] || estado || 'Sin estado';
+}
+
+function formatearFecha(valor) {
+  if (!valor) return 'Sin fecha';
+
+  const fecha = new Date(valor);
+
+  if (isNaN(fecha.getTime())) {
+    return String(valor).split('T')[0];
+  }
+
+  return fecha.toLocaleDateString('es-EC');
+}
+
+function cambiarTab(tab) {
+  tabActual = tab;
+
+  document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
+  document.getElementById(`tab-${tab}`).classList.add('active');
+
+  cargarSolicitudes();
+}
+
+async function cargarSolicitudes() {
+  const lista = document.getElementById('lista');
+  const contador = document.getElementById('contador');
+
+  lista.innerHTML = '<div class="empty">Cargando solicitudes...</div>';
+
+  try {
+    if (tabActual === 'abiertas') {
+      solicitudes = await Solicitudes.listarAbiertas();
+    } else {
+      solicitudes = await Solicitudes.misSolicitudes();
+    }
+
+    contador.textContent = `${solicitudes.length} solicitudes encontradas`;
+    pintarSolicitudes();
+
+  } catch (error) {
+    contador.textContent = 'Error al cargar solicitudes';
+    lista.innerHTML = `<div class="error">${error.message}</div>`;
+  }
+}
+
+function pintarSolicitudes() {
+  const lista = document.getElementById('lista');
+
+  if (!solicitudes || solicitudes.length === 0) {
+    lista.innerHTML = '<div class="empty">No hay solicitudes para mostrar.</div>';
+    return;
+  }
+
+  lista.innerHTML = solicitudes.map(s => `
+    <div class="card">
+      <div>
+        <div class="${estadoClase(s.estado)}">${textoEstado(s.estado)}</div>
+        <div class="title">${s.titulo || 'Sin título'}</div>
+        <div class="desc">${s.descripcion || 'Sin descripción'}</div>
+
+        <div class="meta">
+          <span>📍 ${s.zona || s.ciudad || 'Sin zona'}</span>
+          <span>🧰 ${s.categoria || 'Sin categoría'}</span>
+          <span>💰 ${s.presupuesto ? '$' + s.presupuesto : 'Sin presupuesto'}</span>
+          <span>📅 ${formatearFecha(s.fecha_preferida || s.fecha_servicio || s.createdat)}</span>
+        </div>
+      </div>
+
+      <div class="actions">
+        ${botonesSolicitud(s)}
+      </div>
+    </div>
+  `).join('');
+}
+
+function botonesSolicitud(s) {
+  const botones = [];
+
+  botones.push(`
+    <button class="btn btn-light" onclick="verDetalle(${s.id})">👁️ Ver</button>
+  `);
+
+  if (tieneTrabajador(s)) {
+    botones.push(`
+      <button class="btn btn-blue" onclick="abrirChat(${s.id})">💬 Chat</button>
+    `);
+
+    botones.push(`
+      <button class="btn btn-dark" onclick="abrirSeguimiento(${s.id})">🗺️ Seguimiento</button>
+    `);
+  }
+
+  if (
+    tabActual === 'abiertas' &&
+    usuario &&
+    !esPropietario(s) &&
+    !tieneTrabajador(s) &&
+    s.estado === 'abierta'
+  ) {
+    botones.push(`
+      <button class="btn btn-green" onclick="abrirPostular(${s.id})">Postularme</button>
+    `);
+  }
+
+  if (
+    esTrabajadorAsignado(s) &&
+    ['confirmada', 'en_curso'].includes(s.estado)
+  ) {
+    botones.push(`
+      <button class="btn btn-green" onclick="iniciarCompartirUbicacion(${s.id})">📍 Compartir ubicación</button>
+    `);
+
+    botones.push(`
+      <button class="btn btn-orange" onclick="marcarTrabajadorLlego(${s.id})">Llegué</button>
+    `);
+
+    botones.push(`
+      <button class="btn btn-blue" onclick="marcarEnCurso(${s.id})">Iniciar trabajo</button>
+    `);
+
+    botones.push(`
+      <button class="btn btn-dark" onclick="marcarFinalizado(${s.id})">Finalizar</button>
+    `);
+
+    botones.push(`
+      <button class="btn btn-light" onclick="detenerCompartirUbicacion()">Detener ubicación</button>
+    `);
+  }
+
+  if (
+    esPropietario(s) &&
+    ['abierta', 'confirmada'].includes(s.estado)
+  ) {
+    botones.push(`
+      <button class="btn btn-red" onclick="cancelarSolicitud(${s.id})">Cancelar</button>
+    `);
+  }
+
+  return botones.join('');
+}
+
+async function verDetalle(id) {
+  try {
+    const s = await Solicitudes.detalle(id);
+
+    alert(
+      `Solicitud: ${s.titulo || ''}\n` +
+      `Estado: ${s.estado || ''}\n` +
+      `Categoría: ${s.categoria || ''}\n` +
+      `Cliente: ${(s.cliente_nombre || '') + ' ' + (s.cliente_apellido || '')}\n` +
+      `Trabajador: ${(s.trabajador_nombre || '') + ' ' + (s.trabajador_apellido || '')}\n` +
+      `Descripción: ${s.descripcion || ''}`
+    );
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+function abrirChat(id) {
+  window.location.href = `chat.html?id=${id}`;
+}
+
+function abrirSeguimiento(id) {
+  window.location.href = `seguimiento.html?id=${id}`;
+}
+
+function abrirPostular(id) {
+  if (!usuario) {
+    alert('Debes iniciar sesión para postularte.');
+    window.location.href = 'login.html';
+    return;
+  }
+
+  solicitudPostularId = id;
+
+  document.getElementById('post-mensaje').value = '';
+  document.getElementById('post-precio').value = '';
+  document.getElementById('post-disponibilidad').value = '';
+
+  document.getElementById('modalPostular').style.display = 'flex';
+}
+
+function cerrarPostular() {
+  document.getElementById('modalPostular').style.display = 'none';
+  solicitudPostularId = null;
+}
+
+async function enviarPostulacion() {
+  if (!solicitudPostularId) return;
+
+  const datos = {
+    trabajador_id: usuario.id,
+    mensaje: document.getElementById('post-mensaje').value.trim(),
+    precio_ofertado: document.getElementById('post-precio').value,
+    disponibilidad: document.getElementById('post-disponibilidad').value.trim()
+  };
+
+  try {
+    await Solicitudes.aplicar(solicitudPostularId, datos);
+    alert('Postulación enviada correctamente.');
+    cerrarPostular();
+    cargarSolicitudes();
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+async function cancelarSolicitud(id) {
+  if (!confirm('¿Seguro que deseas cancelar esta solicitud?')) return;
+
+  try {
+    await Solicitudes.cancelar(id);
+    alert('Solicitud cancelada.');
+    cargarSolicitudes();
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+cargarSolicitudes();
+</script>
+
+</body>
+</html>
