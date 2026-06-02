@@ -1,17 +1,18 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { sql, poolPromise } = require('../config/db');
-const { enviarBienvenida, enviarResetPassword } = require('../utils/email');
-const { OAuth2Client } = require('google-auth-library');
-const axios = require('axios');
+const nodemailer = require('nodemailer');
+const { pgPool } = require('../config/db');
 
 function generarToken(usuario) {
   return jwt.sign(
     {
       id: usuario.id,
       email: usuario.email,
-      rol: usuario.rol
+      rol: usuario.rol,
+      is_admin: usuario.is_admin,
+      es_cliente: usuario.es_cliente,
+      es_trabajador: usuario.es_trabajador
     },
     process.env.JWT_SECRET,
     {
@@ -23,53 +24,85 @@ function generarToken(usuario) {
 function limpiarUsuario(usuario) {
   if (!usuario) return null;
 
-  delete usuario.password_hash;
-  delete usuario.email_token;
-  delete usuario.reset_token;
-  delete usuario.reset_token_expiry;
-  delete usuario.token_recuperacion;
-  delete usuario.token_expiracion;
+  const copia = { ...usuario };
+  delete copia.password_hash;
+  delete copia.email_token;
+  delete copia.reset_token;
+  delete copia.reset_token_expiry;
 
-  usuario.nombre = usuario.nombres || usuario.nombre || '';
-  usuario.apellido = usuario.apellidos || usuario.apellido || '';
-
-  return usuario;
+  return copia;
 }
 
-exports.register = async (req, res) => {
+function crearTransporter() {
+  const user = process.env.EMAIL_USER || process.env.MAIL_USER;
+  const pass = process.env.EMAIL_PASS || process.env.MAIL_PASS;
+
+  if (!user || !pass) {
+    console.log('Email no configurado. Se omitirán envíos de correo.');
+    return null;
+  }
+
+  return nodemailer.createTransport({
+    service: process.env.MAIL_SERVICE || 'gmail',
+    auth: {
+      user,
+      pass
+    }
+  });
+}
+
+async function enviarCorreoVerificacion(email, token) {
+  const transporter = crearTransporter();
+
+  if (!transporter) return;
+
+  const frontendUrl =
+    process.env.FRONTEND_URL || 'http://localhost:3000';
+
+  const link = `${frontendUrl}/api/auth/verificar/${token}`;
+
+  await transporter.sendMail({
+    from:
+      process.env.MAIL_FROM ||
+      `OficiosYA <${process.env.EMAIL_USER || process.env.MAIL_USER}>`,
+    to: email,
+    subject: 'Verificación de cuenta - OficiosYA',
+    html: `
+      <h2>Verificación de cuenta</h2>
+      <p>Gracias por registrarte en OficiosYA.</p>
+      <p>Haz clic en el siguiente enlace para verificar tu cuenta:</p>
+      <a href="${link}">${link}</a>
+    `
+  });
+}
+
+exports.registro = async (req, res) => {
   try {
     const {
-      nombre,
-      apellido,
       nombres,
       apellidos,
       email,
       telefono,
+      password,
+      ciudad,
       zona,
-      password
+      direccion,
+      rol
     } = req.body;
 
-    const nombreFinal = nombres || nombre;
-    const apellidoFinal = apellidos || apellido;
-
-    if (!nombreFinal || !apellidoFinal || !email || !password) {
+    if (!nombres || !apellidos || !email || !password) {
       return res.status(400).json({
         ok: false,
-        mensaje: 'Complete los campos obligatorios.'
+        mensaje: 'Nombres, apellidos, correo y contraseña son obligatorios.'
       });
     }
 
-    const pool = await poolPromise;
+    const existe = await pgPool.query(
+      `SELECT id FROM usuarios WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+      [email]
+    );
 
-    const existe = await pool.request()
-      .input('email', sql.VarChar(150), email)
-      .query(`
-        SELECT TOP 1 id
-        FROM usuarios
-        WHERE email = @email
-      `);
-
-    if (existe.recordset.length > 0) {
+    if (existe.rows.length > 0) {
       return res.status(400).json({
         ok: false,
         mensaje: 'El correo ya está registrado.'
@@ -79,69 +112,84 @@ exports.register = async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 10);
     const emailToken = crypto.randomBytes(32).toString('hex');
 
-    const result = await pool.request()
-      .input('nombres', sql.VarChar(100), nombreFinal)
-      .input('apellidos', sql.VarChar(100), apellidoFinal)
-      .input('email', sql.VarChar(150), email)
-      .input('telefono', sql.VarChar(20), telefono || null)
-      .input('zona', sql.VarChar(150), zona || null)
-      .input('password_hash', sql.VarChar(255), passwordHash)
-      .input('email_token', sql.VarChar(255), emailToken)
-      .query(`
-        INSERT INTO usuarios (
-          nombres,
-          apellidos,
-          email,
-          telefono,
-          zona,
-          password_hash,
-          rol,
-          estado,
-          is_admin,
-          email_token,
-          email_verificado,
-          verificado,
-          es_cliente,
-          es_trabajador,
-          createdat
-        )
-        OUTPUT INSERTED.*
-        VALUES (
-          @nombres,
-          @apellidos,
-          @email,
-          @telefono,
-          @zona,
-          @password_hash,
-          'cliente',
-          1,
-          0,
-          @email_token,
-          0,
-          0,
-          1,
-          0,
-          GETDATE()
-        )
-      `);
+    let rolFinal = rol || 'cliente';
+    let esCliente = 1;
+    let esTrabajador = 0;
 
-    const usuario = result.recordset[0];
+    if (rolFinal === 'trabajador') {
+      esCliente = 0;
+      esTrabajador = 1;
+    }
 
-    await enviarBienvenida(usuario, emailToken, usuario.id);
+    if (rolFinal === 'cliente_trabajador') {
+      esCliente = 1;
+      esTrabajador = 1;
+    }
 
+    const nuevoUsuario = await pgPool.query(
+      `
+      INSERT INTO usuarios (
+        nombres,
+        apellidos,
+        email,
+        telefono,
+        zona,
+        ciudad,
+        direccion,
+        password_hash,
+        rol,
+        estado,
+        is_admin,
+        es_cliente,
+        es_trabajador,
+        email_verificado,
+        verificado,
+        email_token,
+        estado_conexion,
+        createdat,
+        updatedat
+      )
+      VALUES (
+        $1, $2, LOWER($3), $4, $5, $6, $7, $8,
+        $9, 1, 0, $10, $11, 1, 1, $12, 'activo', NOW(), NOW()
+      )
+      RETURNING *
+      `,
+      [
+        nombres,
+        apellidos,
+        email,
+        telefono || null,
+        zona || null,
+        ciudad || null,
+        direccion || null,
+        passwordHash,
+        rolFinal,
+        esCliente,
+        esTrabajador,
+        emailToken
+      ]
+    );
+
+    try {
+      await enviarCorreoVerificacion(email, emailToken);
+    } catch (errorCorreo) {
+      console.log('No se pudo enviar correo de verificación:', errorCorreo.message);
+    }
+
+    const usuario = limpiarUsuario(nuevoUsuario.rows[0]);
     const token = generarToken(usuario);
 
-    res.status(201).json({
+    return res.status(201).json({
       ok: true,
       mensaje: 'Usuario registrado correctamente.',
-      token,
-      usuario: limpiarUsuario(usuario)
+      usuario,
+      token
     });
-
   } catch (error) {
-    console.error('Error en register:', error);
+    console.error('Error en registro:', error);
 
-    res.status(500).json({
+    return res.status(500).json({
       ok: false,
       mensaje: 'Error al registrar usuario.',
       error: error.message
@@ -156,57 +204,72 @@ exports.login = async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({
         ok: false,
-        mensaje: 'Ingrese correo y contraseña.'
+        mensaje: 'Correo y contraseña son obligatorios.'
       });
     }
 
-    const pool = await poolPromise;
+    const result = await pgPool.query(
+      `
+      SELECT *
+      FROM usuarios
+      WHERE LOWER(email) = LOWER($1)
+      LIMIT 1
+      `,
+      [email]
+    );
 
-    const result = await pool.request()
-      .input('email', sql.VarChar(150), email)
-      .query(`
-        SELECT TOP 1 *
-        FROM usuarios
-        WHERE email = @email
-      `);
-
-    if (result.recordset.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(401).json({
         ok: false,
-        mensaje: 'Correo o contraseña incorrectos.'
+        mensaje: 'Credenciales incorrectas.'
       });
     }
 
-    const usuario = result.recordset[0];
+    const usuarioDb = result.rows[0];
 
-    let passwordValida = false;
-
-    if (usuario.password_hash && usuario.password_hash.startsWith('$2')) {
-      passwordValida = await bcrypt.compare(password, usuario.password_hash);
-    } else {
-      passwordValida = password === usuario.password_hash;
+    if (Number(usuarioDb.estado) !== 1) {
+      return res.status(403).json({
+        ok: false,
+        mensaje: 'Usuario inactivo.'
+      });
     }
 
-    if (!passwordValida) {
+    const passwordValido = await bcrypt.compare(
+      password,
+      usuarioDb.password_hash
+    );
+
+    if (!passwordValido) {
       return res.status(401).json({
         ok: false,
-        mensaje: 'Correo o contraseña incorrectos.'
+        mensaje: 'Credenciales incorrectas.'
       });
     }
 
+    await pgPool.query(
+      `
+      UPDATE usuarios
+      SET ultima_conexion = NOW(),
+          estado_conexion = 'activo',
+          updatedat = NOW()
+      WHERE id = $1
+      `,
+      [usuarioDb.id]
+    );
+
+    const usuario = limpiarUsuario(usuarioDb);
     const token = generarToken(usuario);
 
-    res.json({
+    return res.json({
       ok: true,
       mensaje: 'Inicio de sesión correcto.',
-      token,
-      usuario: limpiarUsuario(usuario)
+      usuario,
+      token
     });
-
   } catch (error) {
     console.error('Error en login:', error);
 
-    res.status(500).json({
+    return res.status(500).json({
       ok: false,
       mensaje: 'Error al iniciar sesión.',
       error: error.message
@@ -214,50 +277,38 @@ exports.login = async (req, res) => {
   }
 };
 
-exports.verifyEmail = async (req, res) => {
+exports.verificarCorreo = async (req, res) => {
   try {
-    const { token, id } = req.query;
+    const { token } = req.params;
 
-    if (!token || !id) {
+    const result = await pgPool.query(
+      `
+      UPDATE usuarios
+      SET email_verificado = 1,
+          verificado = 1,
+          email_token = NULL,
+          updatedat = NOW()
+      WHERE email_token = $1
+      RETURNING id, email
+      `,
+      [token]
+    );
+
+    if (result.rows.length === 0) {
       return res.status(400).json({
         ok: false,
-        mensaje: 'Token o ID faltante.'
+        mensaje: 'Token inválido o expirado.'
       });
     }
 
-    const pool = await poolPromise;
-
-    const result = await pool.request()
-      .input('id', sql.Int, Number(id))
-      .input('email_token', sql.VarChar(255), token)
-      .query(`
-        UPDATE usuarios
-        SET email_verificado = 1,
-            verificado = 1,
-            email_token = NULL,
-            updatedat = GETDATE()
-        OUTPUT INSERTED.*
-        WHERE id = @id
-          AND email_token = @email_token
-      `);
-
-    if (result.recordset.length === 0) {
-      return res.status(400).json({
-        ok: false,
-        mensaje: 'El enlace no es válido o ya fue utilizado.'
-      });
-    }
-
-    res.json({
+    return res.json({
       ok: true,
-      mensaje: 'Correo verificado correctamente.',
-      usuario: limpiarUsuario(result.recordset[0])
+      mensaje: 'Correo verificado correctamente.'
     });
-
   } catch (error) {
-    console.error('Error al verificar correo:', error);
+    console.error('Error verificando correo:', error);
 
-    res.status(500).json({
+    return res.status(500).json({
       ok: false,
       mensaje: 'Error al verificar correo.',
       error: error.message
@@ -265,37 +316,28 @@ exports.verifyEmail = async (req, res) => {
   }
 };
 
-exports.resendVerification = async (req, res) => {
+exports.reenviarVerificacion = async (req, res) => {
   try {
     const { email } = req.body;
 
-    if (!email) {
-      return res.status(400).json({
-        ok: false,
-        mensaje: 'Correo requerido.'
-      });
-    }
+    const result = await pgPool.query(
+      `
+      SELECT id, email, email_verificado
+      FROM usuarios
+      WHERE LOWER(email) = LOWER($1)
+      LIMIT 1
+      `,
+      [email]
+    );
 
-    const pool = await poolPromise;
-
-    const buscar = await pool.request()
-      .input('email', sql.VarChar(150), email)
-      .query(`
-        SELECT TOP 1 *
-        FROM usuarios
-        WHERE email = @email
-      `);
-
-    if (buscar.recordset.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({
         ok: false,
         mensaje: 'Usuario no encontrado.'
       });
     }
 
-    const usuario = buscar.recordset[0];
-
-    if (usuario.email_verificado || usuario.verificado) {
+    if (Number(result.rows[0].email_verificado) === 1) {
       return res.json({
         ok: true,
         mensaje: 'El correo ya está verificado.'
@@ -304,27 +346,26 @@ exports.resendVerification = async (req, res) => {
 
     const nuevoToken = crypto.randomBytes(32).toString('hex');
 
-    await pool.request()
-      .input('id', sql.Int, usuario.id)
-      .input('email_token', sql.VarChar(255), nuevoToken)
-      .query(`
-        UPDATE usuarios
-        SET email_token = @email_token,
-            updatedat = GETDATE()
-        WHERE id = @id
-      `);
+    await pgPool.query(
+      `
+      UPDATE usuarios
+      SET email_token = $1,
+          updatedat = NOW()
+      WHERE id = $2
+      `,
+      [nuevoToken, result.rows[0].id]
+    );
 
-    await enviarBienvenida(usuario, nuevoToken, usuario.id);
+    await enviarCorreoVerificacion(email, nuevoToken);
 
-    res.json({
+    return res.json({
       ok: true,
       mensaje: 'Correo de verificación reenviado.'
     });
-
   } catch (error) {
-    console.error('Error al reenviar verificación:', error);
+    console.error('Error reenviando verificación:', error);
 
-    res.status(500).json({
+    return res.status(500).json({
       ok: false,
       mensaje: 'Error al reenviar verificación.',
       error: error.message
@@ -332,58 +373,73 @@ exports.resendVerification = async (req, res) => {
   }
 };
 
-exports.forgotPassword = async (req, res) => {
+exports.solicitarResetPassword = async (req, res) => {
   try {
     const { email } = req.body;
 
-    const pool = await poolPromise;
+    const usuario = await pgPool.query(
+      `
+      SELECT id, email
+      FROM usuarios
+      WHERE LOWER(email) = LOWER($1)
+      LIMIT 1
+      `,
+      [email]
+    );
 
-    const buscar = await pool.request()
-      .input('email', sql.VarChar(150), email)
-      .query(`
-        SELECT TOP 1 *
-        FROM usuarios
-        WHERE email = @email
-      `);
-
-    if (buscar.recordset.length === 0) {
+    if (usuario.rows.length === 0) {
       return res.json({
         ok: true,
-        mensaje: 'Si el correo existe, se enviará un enlace.'
+        mensaje: 'Si el correo existe, se enviarán instrucciones.'
       });
     }
 
-    const usuario = buscar.recordset[0];
     const resetToken = crypto.randomBytes(32).toString('hex');
-    const expiry = new Date(Date.now() + 1000 * 60 * 30);
+    const expiracion = new Date(Date.now() + 1000 * 60 * 30);
 
-    await pool.request()
-      .input('id', sql.Int, usuario.id)
-      .input('reset_token', sql.VarChar(255), resetToken)
-      .input('reset_token_expiry', sql.DateTime, expiry)
-      .query(`
-        UPDATE usuarios
-        SET reset_token = @reset_token,
-            reset_token_expiry = @reset_token_expiry,
-            token_recuperacion = @reset_token,
-            token_expiracion = @reset_token_expiry,
-            updatedat = GETDATE()
-        WHERE id = @id
-      `);
+    await pgPool.query(
+      `
+      UPDATE usuarios
+      SET reset_token = $1,
+          reset_token_expiry = $2,
+          updatedat = NOW()
+      WHERE id = $3
+      `,
+      [resetToken, expiracion, usuario.rows[0].id]
+    );
 
-    await enviarResetPassword(usuario, resetToken, usuario.id);
+    const transporter = crearTransporter();
 
-    res.json({
+    if (transporter) {
+      const frontendUrl =
+        process.env.FRONTEND_URL || 'http://localhost:3000';
+
+      const link = `${frontendUrl}/reset-password.html?token=${resetToken}`;
+
+      await transporter.sendMail({
+        from:
+          process.env.MAIL_FROM ||
+          `OficiosYA <${process.env.EMAIL_USER || process.env.MAIL_USER}>`,
+        to: email,
+        subject: 'Recuperar contraseña - OficiosYA',
+        html: `
+          <h2>Recuperar contraseña</h2>
+          <p>Haz clic en el siguiente enlace para cambiar tu contraseña:</p>
+          <a href="${link}">${link}</a>
+        `
+      });
+    }
+
+    return res.json({
       ok: true,
-      mensaje: 'Si el correo existe, se enviará un enlace.'
+      mensaje: 'Si el correo existe, se enviarán instrucciones.'
     });
-
   } catch (error) {
-    console.error('Error en forgotPassword:', error);
+    console.error('Error solicitando reset:', error);
 
-    res.status(500).json({
+    return res.status(500).json({
       ok: false,
-      mensaje: 'Error al solicitar recuperación.',
+      mensaje: 'Error solicitando recuperación.',
       error: error.message
     });
   }
@@ -391,62 +447,55 @@ exports.forgotPassword = async (req, res) => {
 
 exports.resetPassword = async (req, res) => {
   try {
-    const { id, token, password, nuevaPassword } = req.body;
+    const { token, password } = req.body;
 
-    const nueva = password || nuevaPassword;
-
-    if (!id || !token || !nueva) {
+    if (!token || !password) {
       return res.status(400).json({
         ok: false,
-        mensaje: 'Datos incompletos.'
+        mensaje: 'Token y nueva contraseña son obligatorios.'
       });
     }
 
-    const pool = await poolPromise;
+    const usuario = await pgPool.query(
+      `
+      SELECT id
+      FROM usuarios
+      WHERE reset_token = $1
+        AND reset_token_expiry > NOW()
+      LIMIT 1
+      `,
+      [token]
+    );
 
-    const buscar = await pool.request()
-      .input('id', sql.Int, Number(id))
-      .input('reset_token', sql.VarChar(255), token)
-      .query(`
-        SELECT TOP 1 *
-        FROM usuarios
-        WHERE id = @id
-          AND reset_token = @reset_token
-          AND reset_token_expiry > GETDATE()
-      `);
-
-    if (buscar.recordset.length === 0) {
+    if (usuario.rows.length === 0) {
       return res.status(400).json({
         ok: false,
         mensaje: 'Token inválido o expirado.'
       });
     }
 
-    const passwordHash = await bcrypt.hash(nueva, 10);
+    const hash = await bcrypt.hash(password, 10);
 
-    await pool.request()
-      .input('id', sql.Int, Number(id))
-      .input('password_hash', sql.VarChar(255), passwordHash)
-      .query(`
-        UPDATE usuarios
-        SET password_hash = @password_hash,
-            reset_token = NULL,
-            reset_token_expiry = NULL,
-            token_recuperacion = NULL,
-            token_expiracion = NULL,
-            updatedat = GETDATE()
-        WHERE id = @id
-      `);
+    await pgPool.query(
+      `
+      UPDATE usuarios
+      SET password_hash = $1,
+          reset_token = NULL,
+          reset_token_expiry = NULL,
+          updatedat = NOW()
+      WHERE id = $2
+      `,
+      [hash, usuario.rows[0].id]
+    );
 
-    res.json({
+    return res.json({
       ok: true,
       mensaje: 'Contraseña actualizada correctamente.'
     });
-
   } catch (error) {
-    console.error('Error en resetPassword:', error);
+    console.error('Error cambiando contraseña:', error);
 
-    res.status(500).json({
+    return res.status(500).json({
       ok: false,
       mensaje: 'Error al cambiar contraseña.',
       error: error.message
@@ -454,201 +503,33 @@ exports.resetPassword = async (req, res) => {
   }
 };
 
-exports.changePassword = async (req, res) => {
+exports.me = async (req, res) => {
   try {
-    const usuarioId = req.user?.id;
-    const { passwordActual, nuevaPassword } = req.body;
+    const result = await pgPool.query(
+      `
+      SELECT *
+      FROM usuarios
+      WHERE id = $1
+      LIMIT 1
+      `,
+      [req.user.id]
+    );
 
-    if (!usuarioId) {
-      return res.status(401).json({
+    if (result.rows.length === 0) {
+      return res.status(404).json({
         ok: false,
-        mensaje: 'No autorizado.'
+        mensaje: 'Usuario no encontrado.'
       });
     }
 
-    const pool = await poolPromise;
-
-    const buscar = await pool.request()
-      .input('id', sql.Int, Number(usuarioId))
-      .query(`
-        SELECT TOP 1 *
-        FROM usuarios
-        WHERE id = @id
-      `);
-
-    const usuario = buscar.recordset[0];
-
-    const valida = await bcrypt.compare(passwordActual, usuario.password_hash);
-
-    if (!valida) {
-      return res.status(400).json({
-        ok: false,
-        mensaje: 'La contraseña actual no es correcta.'
-      });
-    }
-
-    const passwordHash = await bcrypt.hash(nuevaPassword, 10);
-
-    await pool.request()
-      .input('id', sql.Int, Number(usuarioId))
-      .input('password_hash', sql.VarChar(255), passwordHash)
-      .query(`
-        UPDATE usuarios
-        SET password_hash = @password_hash,
-            updatedat = GETDATE()
-        WHERE id = @id
-      `);
-
-    res.json({
+    return res.json({
       ok: true,
-      mensaje: 'Contraseña actualizada correctamente.'
+      usuario: limpiarUsuario(result.rows[0])
     });
-
   } catch (error) {
-    console.error('Error al cambiar contraseña:', error);
-
-    res.status(500).json({
+    return res.status(500).json({
       ok: false,
-      mensaje: 'Error al cambiar contraseña.',
-      error: error.message
-    });
-  }
-};
-exports.googleLogin = async (req, res) => {
-  try {
-    const { credential } = req.body;
-
-    if (!credential) {
-      return res.status(400).json({
-        ok: false,
-        mensaje: 'Token de Google no recibido.'
-      });
-    }
-
-    const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-
-    const ticket = await client.verifyIdToken({
-      idToken: credential,
-      audience: process.env.GOOGLE_CLIENT_ID
-    });
-
-    const payload = ticket.getPayload();
-
-    const googleId = payload.sub;
-    const email = payload.email;
-    const nombres = payload.given_name || payload.name || 'Usuario';
-    const apellidos = payload.family_name || '';
-    const fotoUrl = payload.picture || null;
-
-    if (!email) {
-      return res.status(400).json({
-        ok: false,
-        mensaje: 'Google no devolvió un correo válido.'
-      });
-    }
-
-    const pool = await poolPromise;
-
-    let buscar = await pool.request()
-      .input('email', sql.VarChar(150), email)
-      .query(`
-        SELECT TOP 1 *
-        FROM usuarios
-        WHERE email = @email
-      `);
-
-    let usuario;
-
-    if (buscar.recordset.length > 0) {
-      const existente = buscar.recordset[0];
-
-      const actualizado = await pool.request()
-        .input('id', sql.Int, existente.id)
-        .input('google_id', sql.VarChar(255), googleId)
-        .input('foto_url', sql.VarChar(500), fotoUrl)
-        .query(`
-          UPDATE usuarios
-          SET google_id = @google_id,
-              provider = 'google',
-              foto_url = COALESCE(foto_url, @foto_url),
-              email_verificado = 1,
-              verificado = 1,
-              updatedat = GETDATE()
-          OUTPUT INSERTED.*
-          WHERE id = @id
-        `);
-
-      usuario = actualizado.recordset[0];
-
-    } else {
-      const creado = await pool.request()
-        .input('nombres', sql.VarChar(100), nombres)
-        .input('apellidos', sql.VarChar(100), apellidos)
-        .input('email', sql.VarChar(150), email)
-        .input('password_hash', sql.VarChar(255), 'GOOGLE_LOGIN')
-        .input('google_id', sql.VarChar(255), googleId)
-        .input('foto_url', sql.VarChar(500), fotoUrl)
-        .query(`
-          INSERT INTO usuarios (
-            nombres,
-            apellidos,
-            email,
-            password_hash,
-            rol,
-            estado,
-            is_admin,
-            es_cliente,
-            es_trabajador,
-            email_verificado,
-            verificado,
-            google_id,
-            provider,
-            foto_url,
-            createdat
-          )
-          OUTPUT INSERTED.*
-          VALUES (
-            @nombres,
-            @apellidos,
-            @email,
-            @password_hash,
-            'cliente',
-            1,
-            0,
-            1,
-            0,
-            1,
-            1,
-            @google_id,
-            'google',
-            @foto_url,
-            GETDATE()
-          )
-        `);
-
-      usuario = creado.recordset[0];
-    }
-
-    const token = generarToken(usuario);
-
-    delete usuario.password_hash;
-    delete usuario.email_token;
-    delete usuario.reset_token;
-    delete usuario.reset_token_expiry;
-
-    res.json({
-      ok: true,
-      mensaje: 'Inicio de sesión con Google correcto.',
-      token,
-      usuario
-    });
-
-  } catch (error) {
-    console.error('Error en Google Login:', error);
-
-    res.status(500).json({
-      ok: false,
-      mensaje: 'Error al iniciar sesión con Google.',
+      mensaje: 'Error obteniendo usuario.',
       error: error.message
     });
   }

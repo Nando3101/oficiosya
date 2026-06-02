@@ -1,37 +1,92 @@
 const jwt = require('jsonwebtoken');
+const { pgPool } = require('../config/db');
 
-function verificarToken(req, res, next) {
+async function verificarToken(req, res, next) {
   try {
-    const authHeader = req.headers.authorization || '';
+    const header = req.headers.authorization || '';
 
-    if (!authHeader.startsWith('Bearer ')) {
+    if (!header.startsWith('Bearer ')) {
       return res.status(401).json({
         ok: false,
         mensaje: 'Token no enviado.'
       });
     }
 
-    const token = authHeader.split(' ')[1];
+    const token = header.replace('Bearer ', '').trim();
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    req.user = {
-      id: decoded.id,
-      email: decoded.email,
-      rol: decoded.rol
-    };
+    const result = await pgPool.query(
+      `
+      SELECT id, email, rol, is_admin, es_cliente, es_trabajador, estado
+      FROM usuarios
+      WHERE id = $1
+      LIMIT 1
+      `,
+      [decoded.id]
+    );
 
+    if (result.rows.length === 0) {
+      return res.status(401).json({
+        ok: false,
+        mensaje: 'Usuario no encontrado.'
+      });
+    }
+
+    const usuario = result.rows[0];
+
+    if (Number(usuario.estado) !== 1) {
+      return res.status(403).json({
+        ok: false,
+        mensaje: 'Usuario inactivo.'
+      });
+    }
+
+    req.user = usuario;
     next();
-
   } catch (error) {
     return res.status(401).json({
       ok: false,
-      mensaje: 'Token inválido o expirado.',
+      mensaje: 'Token inválido.',
       error: error.message
     });
   }
 }
 
+function esAdmin(req, res, next) {
+  if (
+    req.user &&
+    (req.user.rol === 'admin' || Number(req.user.is_admin) === 1)
+  ) {
+    return next();
+  }
+
+  return res.status(403).json({
+    ok: false,
+    mensaje: 'Acceso solo para administradores.'
+  });
+}
+
+function esTrabajador(req, res, next) {
+  if (
+    req.user &&
+    (
+      req.user.rol === 'trabajador' ||
+      req.user.rol === 'cliente_trabajador' ||
+      Number(req.user.es_trabajador) === 1
+    )
+  ) {
+    return next();
+  }
+
+  return res.status(403).json({
+    ok: false,
+    mensaje: 'Acceso solo para trabajadores.'
+  });
+}
+
 module.exports = {
-  verificarToken
+  verificarToken,
+  esAdmin,
+  esTrabajador
 };

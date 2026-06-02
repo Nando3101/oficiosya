@@ -4,41 +4,20 @@ const router = express.Router();
 const solicitudController = require('../controllers/solicitud.controller');
 const { verificarToken } = require('../middlewares/auth.middleware');
 
-function usar(nombre) {
-  if (typeof solicitudController[nombre] !== 'function') {
-    return (req, res) => res.status(501).json({
-      ok: false,
-      mensaje: `Falta implementar solicitudController.${nombre}`
-    });
-  }
+router.get('/categorias', solicitudController.obtenerCategorias);
+router.get('/abiertas', solicitudController.listarAbiertas);
+router.get('/mias/todas', verificarToken, solicitudController.misSolicitudes);
 
-  return solicitudController[nombre];
-}
+router.post('/', verificarToken, solicitudController.crearSolicitud);
+router.post('/:id/aplicar', verificarToken, solicitudController.aplicarSolicitud);
 
-router.get('/categorias', usar('obtenerCategorias'));
-router.get('/abiertas', usar('listarAbiertas'));
-router.get('/estadisticas', verificarToken, usar('estadisticas'));
-router.get('/mias/todas', verificarToken, usar('misSolicitudes'));
+router.get('/:id', solicitudController.detalleSolicitud);
+router.get('/:id/postulaciones', verificarToken, solicitudController.verPostulaciones);
 
-router.post('/', verificarToken, usar('crearSolicitud'));
+router.put('/:id', verificarToken, solicitudController.editarSolicitud);
+router.put('/:id/cancelar', verificarToken, solicitudController.cancelarSolicitud);
+router.put('/postulacion/:postulacionId', verificarToken, solicitudController.gestionarPostulacion);
 
-router.post('/:id/aplicar', verificarToken, usar('aplicarSolicitud'));
-router.get('/:id/mi-postulacion', verificarToken, usar('miPostulacion'));
-router.put('/:id/mi-postulacion', verificarToken, usar('editarMiPostulacion'));
-router.put('/:id/cancelar-post', verificarToken, usar('cancelarPostulacion'));
-
-router.get('/:id/postulaciones', verificarToken, usar('verPostulaciones'));
-router.put('/postulacion/:postulacionId', verificarToken, usar('gestionarPostulacion'));
-
-router.put('/:id/ubicacion-cliente', verificarToken, usar('actualizarUbicacionCliente'));
-router.put('/:id/ubicacion', verificarToken, usar('actualizarUbicacionTrabajador'));
-router.put('/:id/recorrido', verificarToken, usar('actualizarEstadoRecorrido'));
-
-router.get('/:id', usar('detalleSolicitud'));
-router.put('/:id', verificarToken, usar('editarSolicitud'));
-router.delete('/:id', verificarToken, usar('eliminarSolicitud'));
-router.put('/:id/cancelar', verificarToken, usar('cancelarSolicitud'));
-router.put('/:id/iniciar', verificarToken, usar('iniciarTrabajo'));
-router.put('/:id/finalizar', verificarToken, usar('finalizarTrabajo'));
+router.delete('/:id', verificarToken, solicitudController.eliminarSolicitud);
 
 module.exports = router;
