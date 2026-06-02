@@ -60,7 +60,7 @@ async function enviarCorreoVerificacion(email, token) {
   if (!transporter) return;
 
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-  const link = `${frontendUrl}/api/auth/verificar/${token}`;
+  const link = `${frontendUrl}/pages/verificar-email.html?token=${encodeURIComponent(token)}`;
 
   await transporter.sendMail({
     from:
@@ -77,13 +77,9 @@ async function enviarCorreoVerificacion(email, token) {
   });
 }
 
-/* =====================================================
-   REGISTRO
-===================================================== */
-
 exports.registro = async (req, res) => {
   try {
-    const {
+    let {
       nombres,
       apellidos,
       email,
@@ -94,6 +90,9 @@ exports.registro = async (req, res) => {
       direccion,
       rol
     } = req.body;
+
+    nombres = nombres || req.body.nombre;
+    apellidos = apellidos || req.body.apellido;
 
     if (!nombres || !apellidos || !email || !password) {
       return res.status(400).json({
@@ -156,7 +155,7 @@ exports.registro = async (req, res) => {
       )
       VALUES (
         $1, $2, LOWER($3), $4, $5, $6, $7, $8,
-        $9, 1, 0, $10, $11, 1, 1, $12, 'activo', NOW(), NOW()
+        $9, 1, 0, $10, $11, 0, 0, $12, 'activo', NOW(), NOW()
       )
       RETURNING *
       `,
@@ -202,10 +201,6 @@ exports.registro = async (req, res) => {
   }
 };
 
-/* =====================================================
-   LOGIN
-===================================================== */
-
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -243,10 +238,7 @@ exports.login = async (req, res) => {
       });
     }
 
-    const passwordValido = await bcrypt.compare(
-      password,
-      usuarioDb.password_hash
-    );
+    const passwordValido = await bcrypt.compare(password, usuarioDb.password_hash);
 
     if (!passwordValido) {
       return res.status(401).json({
@@ -286,12 +278,6 @@ exports.login = async (req, res) => {
   }
 };
 
-/* =====================================================
-   GOOGLE LOGIN
-   FIX: función faltante — el frontend llama a /auth/google
-   pero no existía implementación en este controlador.
-===================================================== */
-
 exports.googleLogin = async (req, res) => {
   try {
     const { credential } = req.body;
@@ -310,14 +296,20 @@ exports.googleLogin = async (req, res) => {
       });
     }
 
-    // Verificar el token de Google
     const ticket = await googleClient.verifyIdToken({
       idToken: credential,
       audience: process.env.GOOGLE_CLIENT_ID
     });
 
     const payload = ticket.getPayload();
-    const { sub: googleId, email, given_name: nombres, family_name: apellidos, picture: fotoUrl } = payload;
+
+    const {
+      sub: googleId,
+      email,
+      given_name: nombres,
+      family_name: apellidos,
+      picture: fotoUrl
+    } = payload;
 
     if (!email) {
       return res.status(400).json({
@@ -326,7 +318,6 @@ exports.googleLogin = async (req, res) => {
       });
     }
 
-    // Buscar usuario existente por google_id o email
     let result = await pgPool.query(
       `
       SELECT *
@@ -341,7 +332,6 @@ exports.googleLogin = async (req, res) => {
     let usuarioDb;
 
     if (result.rows.length > 0) {
-      // Actualizar datos de Google si ya existe
       const updated = await pgPool.query(
         `
         UPDATE usuarios
@@ -356,15 +346,18 @@ exports.googleLogin = async (req, res) => {
         `,
         [googleId, fotoUrl || null, result.rows[0].id]
       );
+
       usuarioDb = updated.rows[0];
     } else {
-      // Crear nuevo usuario con Google
+      const passwordGoogle = await bcrypt.hash(`google:${googleId}:${Date.now()}`, 10);
+
       const inserted = await pgPool.query(
         `
         INSERT INTO usuarios (
           nombres,
           apellidos,
           email,
+          password_hash,
           google_id,
           provider,
           foto_url,
@@ -381,7 +374,7 @@ exports.googleLogin = async (req, res) => {
           updatedat
         )
         VALUES (
-          $1, $2, LOWER($3), $4, 'google', $5,
+          $1, $2, LOWER($3), $4, $5, 'google', $6,
           'cliente', 1, 0, 1, 0, 1, 1, 'activo', NOW(), NOW(), NOW()
         )
         RETURNING *
@@ -390,10 +383,12 @@ exports.googleLogin = async (req, res) => {
           nombres || email.split('@')[0],
           apellidos || '',
           email,
+          passwordGoogle,
           googleId,
           fotoUrl || null
         ]
       );
+
       usuarioDb = inserted.rows[0];
     }
 
@@ -423,10 +418,6 @@ exports.googleLogin = async (req, res) => {
     });
   }
 };
-
-/* =====================================================
-   VERIFICAR CORREO (por parámetro de ruta)
-===================================================== */
 
 exports.verificarCorreo = async (req, res) => {
   try {
@@ -467,12 +458,6 @@ exports.verificarCorreo = async (req, res) => {
   }
 };
 
-/* =====================================================
-   VERIFICAR CORREO (por query string ?token=...)
-   FIX: función faltante — las rutas /verify-email y
-   /verificar-email llamaban a esta función que no existía.
-===================================================== */
-
 exports.verificarCorreoQuery = async (req, res) => {
   try {
     const { token } = req.query;
@@ -509,7 +494,7 @@ exports.verificarCorreoQuery = async (req, res) => {
       mensaje: 'Correo verificado correctamente.'
     });
   } catch (error) {
-    console.error('Error verificando correo (query):', error);
+    console.error('Error verificando correo:', error);
 
     return res.status(500).json({
       ok: false,
@@ -519,13 +504,16 @@ exports.verificarCorreoQuery = async (req, res) => {
   }
 };
 
-/* =====================================================
-   REENVIAR VERIFICACIÓN
-===================================================== */
-
 exports.reenviarVerificacion = async (req, res) => {
   try {
     const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        ok: false,
+        mensaje: 'El correo es obligatorio.'
+      });
+    }
 
     const result = await pgPool.query(
       `
@@ -580,12 +568,6 @@ exports.reenviarVerificacion = async (req, res) => {
   }
 };
 
-/* =====================================================
-   SOLICITAR RESET DE CONTRASEÑA
-   FIX: el link ahora apunta a /pages/nueva-password.html
-   que es la página que realmente existe en public/pages/.
-===================================================== */
-
 exports.solicitarResetPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -601,7 +583,6 @@ exports.solicitarResetPassword = async (req, res) => {
     );
 
     if (usuario.rows.length === 0) {
-      // Responder igual aunque no exista (evitar enumeración de correos)
       return res.json({
         ok: true,
         mensaje: 'Si el correo existe, se enviarán instrucciones.'
@@ -609,7 +590,7 @@ exports.solicitarResetPassword = async (req, res) => {
     }
 
     const resetToken = crypto.randomBytes(32).toString('hex');
-    const expiracion = new Date(Date.now() + 1000 * 60 * 30); // 30 minutos
+    const expiracion = new Date(Date.now() + 1000 * 60 * 30);
 
     await pgPool.query(
       `
@@ -626,9 +607,6 @@ exports.solicitarResetPassword = async (req, res) => {
 
     if (transporter) {
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-
-      // FIX: antes apuntaba a /reset-password.html que no existe.
-      // La página correcta es /pages/nueva-password.html
       const link = `${frontendUrl}/pages/nueva-password.html?token=${resetToken}`;
 
       await transporter.sendMail({
@@ -661,15 +639,13 @@ exports.solicitarResetPassword = async (req, res) => {
   }
 };
 
-/* =====================================================
-   RESETEAR CONTRASEÑA (con token del correo)
-===================================================== */
-
 exports.resetPassword = async (req, res) => {
   try {
-    const { token, password } = req.body;
+    const { token, password, nuevaPassword } = req.body;
 
-    if (!token || !password) {
+    const nuevaClave = password || nuevaPassword;
+
+    if (!token || !nuevaClave) {
       return res.status(400).json({
         ok: false,
         mensaje: 'Token y nueva contraseña son obligatorios.'
@@ -694,7 +670,7 @@ exports.resetPassword = async (req, res) => {
       });
     }
 
-    const hash = await bcrypt.hash(password, 10);
+    const hash = await bcrypt.hash(nuevaClave, 10);
 
     await pgPool.query(
       `
@@ -723,16 +699,25 @@ exports.resetPassword = async (req, res) => {
   }
 };
 
-/* =====================================================
-   CAMBIAR CONTRASEÑA (usuario autenticado)
-   FIX: función faltante — la ruta POST /change-password
-   llamaba a esta función que no existía en el controlador.
-===================================================== */
-
 exports.cambiarPassword = async (req, res) => {
   try {
     const usuarioId = req.user.id;
-    const { password_actual, password_nuevo } = req.body;
+
+    const password_actual =
+      req.body.password_actual ||
+      req.body.passwordActual ||
+      req.body.actual;
+
+    const password_nuevo =
+      req.body.password_nuevo ||
+      req.body.nuevaPassword ||
+      req.body.nueva ||
+      req.body.password;
+
+    const confirmarPassword =
+      req.body.confirmarPassword ||
+      req.body.password_confirmar ||
+      req.body.confirmacion;
 
     if (!password_actual || !password_nuevo) {
       return res.status(400).json({
@@ -741,10 +726,17 @@ exports.cambiarPassword = async (req, res) => {
       });
     }
 
-    if (password_nuevo.length < 6) {
+    if (password_nuevo.length < 8) {
       return res.status(400).json({
         ok: false,
-        mensaje: 'La nueva contraseña debe tener al menos 6 caracteres.'
+        mensaje: 'La nueva contraseña debe tener al menos 8 caracteres.'
+      });
+    }
+
+    if (confirmarPassword && password_nuevo !== confirmarPassword) {
+      return res.status(400).json({
+        ok: false,
+        mensaje: 'Las contraseñas no coinciden.'
       });
     }
 
@@ -760,10 +752,7 @@ exports.cambiarPassword = async (req, res) => {
       });
     }
 
-    const passwordValido = await bcrypt.compare(
-      password_actual,
-      result.rows[0].password_hash
-    );
+    const passwordValido = await bcrypt.compare(password_actual, result.rows[0].password_hash);
 
     if (!passwordValido) {
       return res.status(401).json({
@@ -798,10 +787,6 @@ exports.cambiarPassword = async (req, res) => {
     });
   }
 };
-
-/* =====================================================
-   OBTENER USUARIO ACTUAL
-===================================================== */
 
 exports.me = async (req, res) => {
   try {
