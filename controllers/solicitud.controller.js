@@ -1,5 +1,9 @@
 const { pgPool } = require('../config/db');
 
+/* =====================================================
+   OBTENER CATEGORÍAS
+===================================================== */
+
 exports.obtenerCategorias = async (req, res) => {
   try {
     const result = await pgPool.query(`
@@ -25,6 +29,11 @@ exports.obtenerCategorias = async (req, res) => {
   }
 };
 
+/* =====================================================
+   CREAR SOLICITUD
+   FIX: agregada validación — presupuesto no puede ser negativo.
+===================================================== */
+
 exports.crearSolicitud = async (req, res) => {
   try {
     const clienteId = req.user.id;
@@ -49,6 +58,17 @@ exports.crearSolicitud = async (req, res) => {
         ok: false,
         mensaje: 'Título y descripción son obligatorios.'
       });
+    }
+
+    // FIX: validar que el presupuesto no sea negativo
+    if (presupuesto !== undefined && presupuesto !== null && presupuesto !== '') {
+      const presupuestoNum = Number(presupuesto);
+      if (isNaN(presupuestoNum) || presupuestoNum < 0) {
+        return res.status(400).json({
+          ok: false,
+          mensaje: 'El presupuesto no puede ser negativo.'
+        });
+      }
     }
 
     const result = await pgPool.query(
@@ -111,6 +131,10 @@ exports.crearSolicitud = async (req, res) => {
   }
 };
 
+/* =====================================================
+   LISTAR SOLICITUDES ABIERTAS
+===================================================== */
+
 exports.listarAbiertas = async (req, res) => {
   try {
     const result = await pgPool.query(`
@@ -142,6 +166,10 @@ exports.listarAbiertas = async (req, res) => {
     });
   }
 };
+
+/* =====================================================
+   MIS SOLICITUDES
+===================================================== */
 
 exports.misSolicitudes = async (req, res) => {
   try {
@@ -179,6 +207,10 @@ exports.misSolicitudes = async (req, res) => {
     });
   }
 };
+
+/* =====================================================
+   DETALLE DE SOLICITUD
+===================================================== */
 
 exports.detalleSolicitud = async (req, res) => {
   try {
@@ -228,6 +260,12 @@ exports.detalleSolicitud = async (req, res) => {
   }
 };
 
+/* =====================================================
+   APLICAR A SOLICITUD (postulación de trabajador)
+   FIX: agregada validación — precio_ofertado/precio_oferta
+   no pueden ser negativos ni cero.
+===================================================== */
+
 exports.aplicarSolicitud = async (req, res) => {
   try {
     const solicitudId = Number(req.params.id);
@@ -239,6 +277,18 @@ exports.aplicarSolicitud = async (req, res) => {
       precio_oferta,
       disponibilidad
     } = req.body;
+
+    // FIX: validar que el precio ofertado no sea negativo ni cero
+    const precioFinal = precio_ofertado || precio_oferta;
+    if (precioFinal !== undefined && precioFinal !== null && precioFinal !== '') {
+      const precioNum = Number(precioFinal);
+      if (isNaN(precioNum) || precioNum <= 0) {
+        return res.status(400).json({
+          ok: false,
+          mensaje: 'El precio ofertado debe ser mayor a 0.'
+        });
+      }
+    }
 
     const solicitud = await pgPool.query(
       `
@@ -280,12 +330,12 @@ exports.aplicarSolicitud = async (req, res) => {
       VALUES ($1, $2, $3, $4, $5, $6, 'pendiente', NOW(), NOW())
       ON CONFLICT (solicitud_id, trabajador_id)
       DO UPDATE SET
-        mensaje = EXCLUDED.mensaje,
-        precio_ofertado = EXCLUDED.precio_ofertado,
-        precio_oferta = EXCLUDED.precio_oferta,
-        disponibilidad = EXCLUDED.disponibilidad,
-        estado = 'pendiente',
-        updatedat = NOW()
+        mensaje          = EXCLUDED.mensaje,
+        precio_ofertado  = EXCLUDED.precio_ofertado,
+        precio_oferta    = EXCLUDED.precio_oferta,
+        disponibilidad   = EXCLUDED.disponibilidad,
+        estado           = 'pendiente',
+        updatedat        = NOW()
       RETURNING *
       `,
       [
@@ -334,6 +384,10 @@ exports.aplicarSolicitud = async (req, res) => {
   }
 };
 
+/* =====================================================
+   VER POSTULACIONES DE UNA SOLICITUD
+===================================================== */
+
 exports.verPostulaciones = async (req, res) => {
   try {
     const solicitudId = Number(req.params.id);
@@ -377,6 +431,10 @@ exports.verPostulaciones = async (req, res) => {
   }
 };
 
+/* =====================================================
+   GESTIONAR POSTULACIÓN (aceptar / rechazar)
+===================================================== */
+
 exports.gestionarPostulacion = async (req, res) => {
   try {
     const postulacionId = Number(req.params.postulacionId);
@@ -412,7 +470,7 @@ exports.gestionarPostulacion = async (req, res) => {
     const result = await pgPool.query(
       `
       UPDATE postulaciones
-      SET estado = $1,
+      SET estado    = $1,
           updatedat = NOW()
       WHERE id = $2
       RETURNING *
@@ -425,8 +483,8 @@ exports.gestionarPostulacion = async (req, res) => {
         `
         UPDATE solicitudes
         SET trabajador_id = $1,
-            estado = 'asignada',
-            updatedat = NOW()
+            estado        = 'asignada',
+            updatedat     = NOW()
         WHERE id = $2
         `,
         [data.trabajador_id, data.solicitud_id]
@@ -435,7 +493,7 @@ exports.gestionarPostulacion = async (req, res) => {
       await pgPool.query(
         `
         UPDATE postulaciones
-        SET estado = 'rechazada',
+        SET estado    = 'rechazada',
             updatedat = NOW()
         WHERE solicitud_id = $1
           AND id <> $2
@@ -461,6 +519,11 @@ exports.gestionarPostulacion = async (req, res) => {
   }
 };
 
+/* =====================================================
+   EDITAR SOLICITUD
+   FIX: agregada validación — presupuesto no puede ser negativo.
+===================================================== */
+
 exports.editarSolicitud = async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -479,20 +542,31 @@ exports.editarSolicitud = async (req, res) => {
       urgencia
     } = req.body;
 
+    // FIX: validar que el presupuesto no sea negativo
+    if (presupuesto !== undefined && presupuesto !== null && presupuesto !== '') {
+      const presupuestoNum = Number(presupuesto);
+      if (isNaN(presupuestoNum) || presupuestoNum < 0) {
+        return res.status(400).json({
+          ok: false,
+          mensaje: 'El presupuesto no puede ser negativo.'
+        });
+      }
+    }
+
     const result = await pgPool.query(
       `
       UPDATE solicitudes
-      SET categoria_id = COALESCE($1, categoria_id),
-          titulo = COALESCE($2, titulo),
-          descripcion = COALESCE($3, descripcion),
-          direccion = COALESCE($4, direccion),
-          ciudad = COALESCE($5, ciudad),
-          zona = COALESCE($6, zona),
-          presupuesto = COALESCE($7, presupuesto),
-          fecha_servicio = COALESCE($8, fecha_servicio),
-          fecha_preferida = COALESCE($9, fecha_preferida),
-          urgencia = COALESCE($10, urgencia),
-          updatedat = NOW()
+      SET categoria_id   = COALESCE($1,  categoria_id),
+          titulo         = COALESCE($2,  titulo),
+          descripcion    = COALESCE($3,  descripcion),
+          direccion      = COALESCE($4,  direccion),
+          ciudad         = COALESCE($5,  ciudad),
+          zona           = COALESCE($6,  zona),
+          presupuesto    = COALESCE($7,  presupuesto),
+          fecha_servicio = COALESCE($8,  fecha_servicio),
+          fecha_preferida= COALESCE($9,  fecha_preferida),
+          urgencia       = COALESCE($10, urgencia),
+          updatedat      = NOW()
       WHERE id = $11
         AND cliente_id = $12
       RETURNING *
@@ -537,6 +611,10 @@ exports.editarSolicitud = async (req, res) => {
   }
 };
 
+/* =====================================================
+   CANCELAR SOLICITUD
+===================================================== */
+
 exports.cancelarSolicitud = async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -545,7 +623,7 @@ exports.cancelarSolicitud = async (req, res) => {
     const result = await pgPool.query(
       `
       UPDATE solicitudes
-      SET estado = 'cancelada',
+      SET estado    = 'cancelada',
           updatedat = NOW()
       WHERE id = $1
         AND cliente_id = $2
@@ -575,6 +653,10 @@ exports.cancelarSolicitud = async (req, res) => {
     });
   }
 };
+
+/* =====================================================
+   ELIMINAR SOLICITUD
+===================================================== */
 
 exports.eliminarSolicitud = async (req, res) => {
   try {
