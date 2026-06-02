@@ -155,7 +155,8 @@ server.listen(PORT, '0.0.0.0', () => {
 app.get('/api/version', (req, res) => {
   res.json({
     ok: true,
-    version: 'auth-fix-2026-06-02-1125',
-    mensaje: 'Railway está usando el código nuevo'
+    version: 'auth-fix-14d427a',
+    fecha: '2026-06-02',
+    mensaje: 'Railway está usando el server.js corregido'
   });
 });
