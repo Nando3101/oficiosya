@@ -1,18 +1,23 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 const connectionString =
   process.env.DATABASE_URL ||
   process.env.POSTGRES_URL ||
   process.env.PG_URL;
 
+if (isProduction && !connectionString) {
+  console.error('ERROR: Falta DATABASE_URL en Railway.');
+  console.error('Agrega en el servicio Node.js: DATABASE_URL=${{Postgres.DATABASE_URL}}');
+  process.exit(1);
+}
+
 const poolConfig = connectionString
   ? {
       connectionString,
-      ssl:
-        process.env.NODE_ENV === 'production'
-          ? { rejectUnauthorized: false }
-          : false
+      ssl: isProduction ? { rejectUnauthorized: false } : false
     }
   : {
       host: process.env.PGHOST || process.env.DB_HOST || 'localhost',
@@ -20,19 +25,18 @@ const poolConfig = connectionString
       database: process.env.PGDATABASE || process.env.DB_DATABASE || 'oficiosya',
       user: process.env.PGUSER || process.env.DB_USER || 'postgres',
       password: process.env.PGPASSWORD || process.env.DB_PASSWORD || 'postgres',
-      ssl:
-        process.env.NODE_ENV === 'production' &&
-        process.env.DB_SSL !== 'false'
-          ? { rejectUnauthorized: false }
-          : false
+      ssl: false
     };
 
 const pgPool = new Pool(poolConfig);
 
-/*
-  Capa de compatibilidad para que tus controladores antiguos
-  que usaban estilo SQL Server funcionen con PostgreSQL.
-*/
+pgPool.on('connect', () => {
+  console.log('Conectado correctamente a PostgreSQL');
+});
+
+pgPool.on('error', (err) => {
+  console.error('Error inesperado en PostgreSQL:', err.message);
+});
 
 const sql = {
   Int: 'int',
@@ -45,7 +49,8 @@ const sql = {
   NVarChar: () => 'varchar',
   Text: 'text',
   Date: 'date',
-  DateTime: 'timestamp'
+  DateTime: 'timestamp',
+  MAX: 'max'
 };
 
 function normalizeParams(query, paramsByName) {
@@ -114,9 +119,7 @@ function convertOutputClause(query) {
 function convertTop(query) {
   const top = query.match(/^\s*SELECT\s+TOP\s+(\d+)\s+/i);
 
-  if (!top) {
-    return query;
-  }
+  if (!top) return query;
 
   const n = top[1];
 
@@ -138,17 +141,20 @@ function convertSqlServerToPostgres(query) {
   q = convertTop(q);
 
   q = q.replace(/\bGETDATE\s*\(\s*\)/gi, 'NOW()');
+  q = q.replace(/\bGETUTCDATE\s*\(\s*\)/gi, 'NOW()');
   q = q.replace(/\bISNULL\s*\(/gi, 'COALESCE(');
   q = q.replace(/\bLEN\s*\(/gi, 'LENGTH(');
+
+  q = q.replace(/\bNVARCHAR\s*\(\s*MAX\s*\)/gi, 'TEXT');
+  q = q.replace(/\bVARCHAR\s*\(\s*MAX\s*\)/gi, 'TEXT');
+  q = q.replace(/\bNVARCHAR\s*\(\s*\d+\s*\)/gi, 'VARCHAR');
+  q = q.replace(/\bBIT\b/gi, 'INTEGER');
 
   q = q.replace(
     /CAST\s*\(([^()]+?)\s+AS\s+FLOAT\s*\)/gi,
     'CAST($1 AS DOUBLE PRECISION)'
   );
 
-  q = q.replace(/\bBIT\b/gi, 'INTEGER');
-  q = q.replace(/\bNVARCHAR\s*\(\s*MAX\s*\)/gi, 'TEXT');
-  q = q.replace(/\bVARCHAR\s*\(\s*MAX\s*\)/gi, 'TEXT');
   q = q.replace(/\[([^\]]+)\]/g, '$1');
 
   return q;
@@ -210,7 +216,7 @@ const poolPromise = pgPool
   .connect()
   .then((client) => {
     client.release();
-    console.log('Conectado correctamente a PostgreSQL');
+    console.log('Pool PostgreSQL listo');
     return compatPool;
   })
   .catch((error) => {

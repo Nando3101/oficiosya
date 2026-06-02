@@ -67,52 +67,80 @@ async function insertarDatosIniciales() {
 
   await pgPool.query(`
     INSERT INTO perfiles_trabajador (
-      usuario_id, categoria_id, descripcion, experiencia, tarifa_referencia, disponibilidad
+      usuario_id, categoria_id, titulo, descripcion, experiencia,
+      ubicacion, tarifa_referencia, tarifa_referencial, precio_desde,
+      disponibilidad, disponible
     )
     SELECT u.id, c.id,
+           'Carpintero',
            'Realizo trabajos de carpintería, reparación de muebles y mantenimiento general.',
-           '3 años de experiencia en el área.',
+           '3 años de experiencia en carpintería.',
+           'Ambato',
            10.00,
-           'Disponible'
+           10.00,
+           10.00,
+           'Disponible',
+           1
     FROM usuarios u, categorias c
     WHERE u.email = 'danilogarcia457@gmail.com'
       AND c.nombre = 'Carpintería'
     ON CONFLICT (usuario_id) DO NOTHING;
 
     INSERT INTO perfiles_trabajador (
-      usuario_id, categoria_id, descripcion, experiencia, tarifa_referencia, disponibilidad
+      usuario_id, categoria_id, titulo, descripcion, experiencia,
+      ubicacion, tarifa_referencia, tarifa_referencial, precio_desde,
+      disponibilidad, disponible
     )
     SELECT u.id, c.id,
+           'Electricista',
            'Técnica en instalaciones eléctricas residenciales.',
            '5 años de experiencia en instalaciones y reparaciones eléctricas.',
+           'Norte',
            25.00,
-           'Disponible'
+           25.00,
+           25.00,
+           'Disponible',
+           1
     FROM usuarios u, categorias c
     WHERE u.email = 'ana.gomez@oficiosya.com'
       AND c.nombre = 'Electricidad'
     ON CONFLICT (usuario_id) DO NOTHING;
 
     INSERT INTO perfiles_trabajador (
-      usuario_id, categoria_id, descripcion, experiencia, tarifa_referencia, disponibilidad
+      usuario_id, categoria_id, titulo, descripcion, experiencia,
+      ubicacion, tarifa_referencia, tarifa_referencial, precio_desde,
+      disponibilidad, disponible
     )
     SELECT u.id, c.id,
+           'Plomero',
            'Plomero con experiencia en fugas, baños, tuberías y mantenimiento.',
            '4 años de experiencia en plomería.',
+           'Centro',
            20.00,
-           'Disponible'
+           20.00,
+           20.00,
+           'Disponible',
+           1
     FROM usuarios u, categorias c
     WHERE u.email = 'carlos.perez@oficiosya.com'
       AND c.nombre = 'Plomería'
     ON CONFLICT (usuario_id) DO NOTHING;
 
     INSERT INTO perfiles_trabajador (
-      usuario_id, categoria_id, descripcion, experiencia, tarifa_referencia, disponibilidad
+      usuario_id, categoria_id, titulo, descripcion, experiencia,
+      ubicacion, tarifa_referencia, tarifa_referencial, precio_desde,
+      disponibilidad, disponible
     )
     SELECT u.id, c.id,
+           'Pintor',
            'Pintor profesional para interiores y exteriores.',
            '6 años de experiencia en pintura y acabados.',
+           'Sur',
            30.00,
-           'Disponible'
+           30.00,
+           30.00,
+           'Disponible',
+           1
     FROM usuarios u, categorias c
     WHERE u.email = 'luis.mora@oficiosya.com'
       AND c.nombre = 'Pintura'
@@ -167,19 +195,23 @@ async function insertarDatosIniciales() {
 }
 
 async function initDb() {
-  await crearTablas();
-  await insertarDatosIniciales();
+  try {
+    await crearTablas();
+    await insertarDatosIniciales();
+    console.log('Base de datos inicializada correctamente.');
+  } catch (error) {
+    console.error('Error inicializando base de datos:', error.message);
+    throw error;
+  }
 }
 
 if (require.main === module) {
   initDb()
     .then(async () => {
-      console.log('Base de datos inicializada correctamente.');
       await pgPool.end();
       process.exit(0);
     })
-    .catch(async (error) => {
-      console.error('Error inicializando base de datos:', error);
+    .catch(async () => {
       await pgPool.end();
       process.exit(1);
     });
