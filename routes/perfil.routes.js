@@ -4,7 +4,13 @@ const multer = require('multer');
 const path = require('path');
 
 const perfilController = require('../controllers/perfil.controller');
-const { verificarToken } = require('../middlewares/auth.middleware');
+const authMiddleware = require('../middlewares/auth.middleware');
+
+const verificarToken =
+  authMiddleware.verificarToken ||
+  authMiddleware.authMiddleware ||
+  authMiddleware.protegerRuta ||
+  authMiddleware.requireAuth;
 
 function usarFuncion(nombre) {
   if (typeof perfilController[nombre] === 'function') {
@@ -17,6 +23,21 @@ function usarFuncion(nombre) {
     return res.status(501).json({
       ok: false,
       mensaje: `La función ${nombre} no está implementada en perfil.controller.js`
+    });
+  };
+}
+
+function usarMiddleware(middleware, nombre) {
+  if (typeof middleware === 'function') {
+    return middleware;
+  }
+
+  console.error(`Falta middleware: ${nombre}`);
+
+  return (req, res) => {
+    return res.status(500).json({
+      ok: false,
+      mensaje: `El middleware ${nombre} no está implementado correctamente.`
     });
   };
 }
@@ -40,22 +61,79 @@ router.get('/debug', (req, res) => {
   });
 });
 
-router.get('/me', verificarToken, usarFuncion('obtenerMiPerfil'));
-router.put('/me', verificarToken, usarFuncion('actualizarMiPerfil'));
-router.put('/datos', verificarToken, usarFuncion('actualizarMiPerfil'));
+router.get(
+  '/me',
+  usarMiddleware(verificarToken, 'verificarToken'),
+  usarFuncion('obtenerMiPerfil')
+);
 
-router.put('/foto', verificarToken, upload.single('foto'), usarFuncion('subirFoto'));
+router.put(
+  '/me',
+  usarMiddleware(verificarToken, 'verificarToken'),
+  usarFuncion('actualizarMiPerfil')
+);
 
-router.get('/profesional', verificarToken, usarFuncion('obtenerPerfilTrabajador'));
-router.post('/profesional', verificarToken, usarFuncion('crearActualizarPerfilTrabajador'));
-router.put('/profesional', verificarToken, usarFuncion('crearActualizarPerfilTrabajador'));
+router.put(
+  '/datos',
+  usarMiddleware(verificarToken, 'verificarToken'),
+  usarFuncion('actualizarMiPerfil')
+);
 
-router.get('/trabajador', verificarToken, usarFuncion('obtenerPerfilTrabajador'));
-router.post('/trabajador', verificarToken, usarFuncion('crearActualizarPerfilTrabajador'));
-router.put('/trabajador', verificarToken, usarFuncion('crearActualizarPerfilTrabajador'));
+router.put(
+  '/foto',
+  usarMiddleware(verificarToken, 'verificarToken'),
+  upload.single('foto'),
+  usarFuncion('subirFoto')
+);
 
-router.get('/verificaciones', verificarToken, usarFuncion('misVerificaciones'));
-router.post('/verificacion', verificarToken, upload.single('documento'), usarFuncion('subirVerificacion'));
+router.get(
+  '/profesional',
+  usarMiddleware(verificarToken, 'verificarToken'),
+  usarFuncion('obtenerPerfilTrabajador')
+);
+
+router.post(
+  '/profesional',
+  usarMiddleware(verificarToken, 'verificarToken'),
+  usarFuncion('crearActualizarPerfilTrabajador')
+);
+
+router.put(
+  '/profesional',
+  usarMiddleware(verificarToken, 'verificarToken'),
+  usarFuncion('crearActualizarPerfilTrabajador')
+);
+
+router.get(
+  '/trabajador',
+  usarMiddleware(verificarToken, 'verificarToken'),
+  usarFuncion('obtenerPerfilTrabajador')
+);
+
+router.post(
+  '/trabajador',
+  usarMiddleware(verificarToken, 'verificarToken'),
+  usarFuncion('crearActualizarPerfilTrabajador')
+);
+
+router.put(
+  '/trabajador',
+  usarMiddleware(verificarToken, 'verificarToken'),
+  usarFuncion('crearActualizarPerfilTrabajador')
+);
+
+router.get(
+  '/verificaciones',
+  usarMiddleware(verificarToken, 'verificarToken'),
+  usarFuncion('misVerificaciones')
+);
+
+router.post(
+  '/verificacion',
+  usarMiddleware(verificarToken, 'verificarToken'),
+  upload.single('documento'),
+  usarFuncion('subirVerificacion')
+);
 
 router.get('/:id', usarFuncion('obtenerPerfilPublico'));
 

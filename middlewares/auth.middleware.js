@@ -1,41 +1,54 @@
 const jwt = require('jsonwebtoken');
 const { pgPool } = require('../config/db');
 
-/* =====================================================
-   VERIFICAR TOKEN
-   NOTA: la columna 'estado' en la tabla usuarios es INTEGER (1=activo, 0=inactivo).
-   La comparación se hace con truthy check para soportar tanto INTEGER
-   como posibles variantes booleanas que PostgreSQL puede devolver
-   según el driver/versión.
-===================================================== */
-
 async function verificarToken(req, res, next) {
   try {
-    const header = req.headers.authorization || '';
+    const authHeader = req.headers.authorization || req.headers.Authorization;
 
-    if (!header.startsWith('Bearer ')) {
+    if (!authHeader) {
       return res.status(401).json({
         ok: false,
-        mensaje: 'Token no enviado.'
+        mensaje: 'Token no proporcionado.'
       });
     }
 
-    const token = header.replace('Bearer ', '').trim();
+    const partes = authHeader.split(' ');
 
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
-    } catch (jwtError) {
+    if (partes.length !== 2 || partes[0] !== 'Bearer') {
       return res.status(401).json({
         ok: false,
-        mensaje: 'Token inválido o expirado.',
-        error: jwtError.message
+        mensaje: 'Formato de token inválido.'
+      });
+    }
+
+    const token = partes[1];
+
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET || 'oficiosya_secret_temporal'
+    );
+
+    if (!decoded || !decoded.id) {
+      return res.status(401).json({
+        ok: false,
+        mensaje: 'Token inválido.'
       });
     }
 
     const result = await pgPool.query(
       `
-      SELECT id, email, rol, is_admin, es_cliente, es_trabajador, estado
+      SELECT 
+        id,
+        nombres,
+        apellidos,
+        email,
+        rol,
+        estado,
+        is_admin,
+        es_cliente,
+        es_trabajador,
+        email_verificado,
+        verificado
       FROM usuarios
       WHERE id = $1
       LIMIT 1
@@ -52,72 +65,94 @@ async function verificarToken(req, res, next) {
 
     const usuario = result.rows[0];
 
-    // Soporta estado como INTEGER (1/0), string ('1'/'0') o boolean (true/false)
-    const activo = usuario.estado === true || Number(usuario.estado) === 1;
-
-    if (!activo) {
+    if (Number(usuario.estado) !== 1) {
       return res.status(403).json({
         ok: false,
         mensaje: 'Usuario inactivo.'
       });
     }
 
-    // Siempre se asigna como req.user para consistencia en todos los controllers
     req.user = usuario;
+    req.usuario = usuario;
+
     next();
   } catch (error) {
+    console.error('Error verificando token:', error.message);
+
     return res.status(401).json({
       ok: false,
-      mensaje: 'Error verificando token.',
+      mensaje: 'Token inválido o expirado.',
       error: error.message
     });
   }
 }
 
-/* =====================================================
-   MIDDLEWARE: solo administradores
-   Acepta rol === 'admin' O is_admin === 1
-===================================================== */
+function verificarAdmin(req, res, next) {
+  const usuario = req.user || req.usuario;
 
-function esAdmin(req, res, next) {
-  if (
-    req.user &&
-    (req.user.rol === 'admin' || Number(req.user.is_admin) === 1)
-  ) {
-    return next();
+  if (!usuario) {
+    return res.status(401).json({
+      ok: false,
+      mensaje: 'Usuario no autenticado.'
+    });
   }
 
-  return res.status(403).json({
-    ok: false,
-    mensaje: 'Acceso solo para administradores.'
-  });
+  const esAdmin =
+    usuario.rol === 'admin' ||
+    usuario.is_admin === true ||
+    usuario.is_admin === 1 ||
+    usuario.is_admin === '1';
+
+  if (!esAdmin) {
+    return res.status(403).json({
+      ok: false,
+      mensaje: 'Acceso denegado. Se requiere administrador.'
+    });
+  }
+
+  next();
 }
 
-/* =====================================================
-   MIDDLEWARE: solo trabajadores
-   Acepta rol trabajador/cliente_trabajador O es_trabajador === 1
-===================================================== */
+function verificarTrabajador(req, res, next) {
+  const usuario = req.user || req.usuario;
 
-function esTrabajador(req, res, next) {
-  if (
-    req.user &&
-    (
-      req.user.rol === 'trabajador' ||
-      req.user.rol === 'cliente_trabajador' ||
-      Number(req.user.es_trabajador) === 1
-    )
-  ) {
-    return next();
+  if (!usuario) {
+    return res.status(401).json({
+      ok: false,
+      mensaje: 'Usuario no autenticado.'
+    });
   }
 
-  return res.status(403).json({
-    ok: false,
-    mensaje: 'Acceso solo para trabajadores.'
-  });
+  const esTrabajador =
+    usuario.es_trabajador === true ||
+    usuario.es_trabajador === 1 ||
+    usuario.es_trabajador === '1' ||
+    usuario.rol === 'trabajador' ||
+    usuario.rol === 'cliente_trabajador';
+
+  if (!esTrabajador) {
+    return res.status(403).json({
+      ok: false,
+      mensaje: 'Acceso denegado. Se requiere perfil de trabajador.'
+    });
+  }
+
+  next();
 }
 
 module.exports = {
   verificarToken,
-  esAdmin,
-  esTrabajador
+  verificarAdmin,
+  verificarTrabajador,
+
+  // Alias por compatibilidad con otros archivos del proyecto
+  authMiddleware: verificarToken,
+  protegerRuta: verificarToken,
+  requireAuth: verificarToken,
+  isAuth: verificarToken,
+  esAdmin: verificarAdmin,
+  isAdmin: verificarAdmin,
+  requireAdmin: verificarAdmin,
+  esTrabajador: verificarTrabajador,
+  requireTrabajador: verificarTrabajador
 };
