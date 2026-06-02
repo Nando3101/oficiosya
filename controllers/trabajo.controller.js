@@ -1,8 +1,20 @@
 const { pgPool } = require('../config/db');
 
+function obtenerUsuarioId(req) {
+  return req.user?.id || req.body?.trabajador_id || req.body?.usuario_id || null;
+}
+
 exports.misTrabajos = async (req, res) => {
   try {
-    const usuarioId = req.user.id;
+    const usuarioId = obtenerUsuarioId(req);
+
+    if (!usuarioId) {
+      return res.json({
+        ok: true,
+        trabajos: [],
+        data: []
+      });
+    }
 
     const result = await pgPool.query(
       `
@@ -25,14 +37,22 @@ exports.misTrabajos = async (req, res) => {
     return res.status(500).json({
       ok: false,
       mensaje: 'Error obteniendo trabajos.',
-      error: error.message
+      error: error.message,
+      trabajos: []
     });
   }
 };
 
 exports.subirTrabajo = async (req, res) => {
   try {
-    const usuarioId = req.user.id;
+    const usuarioId = obtenerUsuarioId(req);
+
+    if (!usuarioId) {
+      return res.status(400).json({
+        ok: false,
+        mensaje: 'No se pudo identificar al trabajador.'
+      });
+    }
 
     const {
       solicitud_id,
@@ -40,7 +60,15 @@ exports.subirTrabajo = async (req, res) => {
       descripcion
     } = req.body;
 
-    const urlImagen = req.file ? `/uploads/${req.file.filename}` : null;
+    const urlImagen = req.file ? `/uploads/${req.file.filename}` : req.body.url_imagen || null;
+    const publicId = req.file ? req.file.filename : req.body.public_id || null;
+
+    if (!urlImagen) {
+      return res.status(400).json({
+        ok: false,
+        mensaje: 'Debes subir una imagen del trabajo.'
+      });
+    }
 
     const result = await pgPool.query(
       `
@@ -49,12 +77,13 @@ exports.subirTrabajo = async (req, res) => {
         trabajador_id,
         cliente_id,
         url_imagen,
+        public_id,
         descripcion,
         estado,
         createdat,
         updatedat
       )
-      VALUES ($1, $2, $3, $4, $5, 'finalizado', NOW(), NOW())
+      VALUES ($1, $2, $3, $4, $5, $6, 'finalizado', NOW(), NOW())
       RETURNING *
       `,
       [
@@ -62,6 +91,7 @@ exports.subirTrabajo = async (req, res) => {
         usuarioId,
         cliente_id || null,
         urlImagen,
+        publicId,
         descripcion || null
       ]
     );
@@ -85,14 +115,21 @@ exports.subirTrabajo = async (req, res) => {
 
 exports.eliminarTrabajo = async (req, res) => {
   try {
-    const usuarioId = req.user.id;
+    const usuarioId = obtenerUsuarioId(req);
     const id = Number(req.params.id);
+
+    if (!usuarioId) {
+      return res.status(400).json({
+        ok: false,
+        mensaje: 'No se pudo identificar al trabajador.'
+      });
+    }
 
     const result = await pgPool.query(
       `
       DELETE FROM trabajos_realizados
       WHERE id = $1
-      AND trabajador_id = $2
+        AND trabajador_id = $2
       RETURNING *
       `,
       [id, usuarioId]
@@ -107,7 +144,9 @@ exports.eliminarTrabajo = async (req, res) => {
 
     return res.json({
       ok: true,
-      mensaje: 'Trabajo eliminado correctamente.'
+      mensaje: 'Trabajo eliminado correctamente.',
+      trabajo: result.rows[0],
+      data: result.rows[0]
     });
   } catch (error) {
     console.error('Error eliminando trabajo:', error);
