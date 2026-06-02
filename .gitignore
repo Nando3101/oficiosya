@@ -1,5 +1,35 @@
+# Dependencias
 node_modules/
+
+# Variables de entorno
 .env
-.DS_Store
+.env.local
+.env.development
+.env.production
+
+# Logs
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+logs/
+*.log
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Archivos temporales
+*.tmp
+*.temp
+
+# Uploads locales
 uploads/*.tmp
+uploads/temp/
+uploads/cache/
+
+# Build / cache
+dist/
+build/
+.cache/
+.vscode/
