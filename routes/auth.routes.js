@@ -2,7 +2,13 @@ const express = require('express');
 const router = express.Router();
 
 const authController = require('../controllers/auth.controller');
-const { verificarToken } = require('../middlewares/auth.middleware');
+const authMiddleware = require('../middlewares/auth.middleware');
+
+const verificarToken =
+  authMiddleware.verificarToken ||
+  authMiddleware.authMiddleware ||
+  authMiddleware.protegerRuta ||
+  authMiddleware.requireAuth;
 
 function usarFuncion(nombre) {
   if (typeof authController[nombre] === 'function') {
@@ -19,6 +25,21 @@ function usarFuncion(nombre) {
   };
 }
 
+function usarMiddleware(middleware, nombre) {
+  if (typeof middleware === 'function') {
+    return middleware;
+  }
+
+  console.error(`Falta middleware: ${nombre}`);
+
+  return (req, res) => {
+    return res.status(500).json({
+      ok: false,
+      mensaje: `El middleware ${nombre} no está implementado correctamente.`
+    });
+  };
+}
+
 router.get('/debug', (req, res) => {
   res.json({
     ok: true,
@@ -28,12 +49,9 @@ router.get('/debug', (req, res) => {
       'POST /api/auth/register',
       'POST /api/auth/login',
       'POST /api/auth/google',
-      'GET /api/auth/verificar/:token',
-      'GET /api/auth/verify/:token',
       'GET /api/auth/verify-email',
-      'GET /api/auth/verificar-email',
+      'GET /api/auth/verificar/:token',
       'POST /api/auth/reenviar-verificacion',
-      'POST /api/auth/resend-verification',
       'POST /api/auth/forgot-password',
       'POST /api/auth/reset-password',
       'POST /api/auth/change-password',
@@ -44,14 +62,11 @@ router.get('/debug', (req, res) => {
 
 router.post('/registro', usarFuncion('registro'));
 router.post('/register', usarFuncion('registro'));
-
 router.post('/login', usarFuncion('login'));
-
 router.post('/google', usarFuncion('googleLogin'));
 
 router.get('/verificar/:token', usarFuncion('verificarCorreo'));
 router.get('/verify/:token', usarFuncion('verificarCorreo'));
-
 router.get('/verify-email', usarFuncion('verificarCorreoQuery'));
 router.get('/verificar-email', usarFuncion('verificarCorreoQuery'));
 
@@ -61,7 +76,16 @@ router.post('/resend-verification', usarFuncion('reenviarVerificacion'));
 router.post('/forgot-password', usarFuncion('solicitarResetPassword'));
 router.post('/reset-password', usarFuncion('resetPassword'));
 
-router.post('/change-password', verificarToken, usarFuncion('cambiarPassword'));
-router.get('/me', verificarToken, usarFuncion('me'));
+router.post(
+  '/change-password',
+  usarMiddleware(verificarToken, 'verificarToken'),
+  usarFuncion('cambiarPassword')
+);
+
+router.get(
+  '/me',
+  usarMiddleware(verificarToken, 'verificarToken'),
+  usarFuncion('me')
+);
 
 module.exports = router;

@@ -88,10 +88,14 @@ function cargarRuta(rutaBase, archivoRuta) {
   try {
     const ruta = require(archivoRuta);
     app.use(rutaBase, ruta);
-    console.log(`Ruta cargada: ${rutaBase}`);
+    console.log(`✓ Ruta cargada: ${rutaBase}`);
+    return true;
   } catch (error) {
-    console.error(`No se pudo cargar la ruta: ${rutaBase}`);
-    console.error(`Detalle: ${error.message}`);
+    console.error(`✗ ERROR CARGANDO RUTA: ${rutaBase}`);
+    console.error(`  Archivo: ${archivoRuta}`);
+    console.error(`  Detalle: ${error.message}`);
+    console.error(`  Stack: ${error.stack}`);
+    return false;
   }
 }
 
@@ -99,17 +103,23 @@ function cargarRuta(rutaBase, archivoRuta) {
    RUTAS BACKEND
 ===================================================== */
 
-cargarRuta('/api/auth', './routes/auth.routes');
-cargarRuta('/api/perfil', './routes/perfil.routes');
-cargarRuta('/api/solicitudes', './routes/solicitud.routes');
-cargarRuta('/api/trabajadores', './routes/trabajador.routes');
-cargarRuta('/api/calificaciones', './routes/calificacion.routes');
-cargarRuta('/api/chat', './routes/chat.routes');
-cargarRuta('/api/notificaciones', './routes/notificacion.routes');
-cargarRuta('/api/admin', './routes/admin.routes');
-cargarRuta('/api/stats', './routes/stats.routes');
-cargarRuta('/api/trabajos', './routes/trabajo.routes');
-cargarRuta('/api/estado', './routes/estado.routes');
+const rutasBackend = [
+  ['/api/auth', './routes/auth.routes'],
+  ['/api/perfil', './routes/perfil.routes'],
+  ['/api/solicitudes', './routes/solicitud.routes'],
+  ['/api/trabajadores', './routes/trabajador.routes'],
+  ['/api/calificaciones', './routes/calificacion.routes'],
+  ['/api/chat', './routes/chat.routes'],
+  ['/api/notificaciones', './routes/notificacion.routes'],
+  ['/api/admin', './routes/admin.routes'],
+  ['/api/stats', './routes/stats.routes'],
+  ['/api/trabajos', './routes/trabajo.routes'],
+  ['/api/estado', './routes/estado.routes']
+];
+
+console.log('\n=== INICIANDO CARGA DE RUTAS ===\n');
+rutasBackend.forEach(([base, archivo]) => cargarRuta(base, archivo));
+console.log('\n=== RUTAS CARGADAS ===\n');
 
 /* =====================================================
    FRONTEND
