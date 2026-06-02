@@ -8,6 +8,8 @@ require('dotenv').config();
 const app = express();
 const server = http.createServer(app);
 
+console.log('VERSION SERVER ACTIVA: auth-fix-final-1207');
+
 const PORT = process.env.PORT || 3000;
 
 /* =====================================================
@@ -32,6 +34,19 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(express.static(path.join(__dirname, 'public')));
 
 /* =====================================================
+   RUTA DE VERSIÓN PARA VERIFICAR RAILWAY
+===================================================== */
+
+app.get('/api/version', (req, res) => {
+  res.json({
+    ok: true,
+    version: 'auth-fix-final-1207',
+    fecha: '2026-06-02',
+    mensaje: 'Railway está usando el server.js corregido'
+  });
+});
+
+/* =====================================================
    RUTA BASE API
 ===================================================== */
 
@@ -39,11 +54,14 @@ app.get('/api', (req, res) => {
   res.json({
     ok: true,
     mensaje: 'API OficiosYA funcionando correctamente',
+    version: 'auth-fix-final-1207',
     rutas: [
+      '/api/version',
       '/api/auth/debug',
       '/api/auth/login',
       '/api/auth/registro',
       '/api/auth/register',
+      '/api/perfil/debug',
       '/api/perfil/me',
       '/api/solicitudes',
       '/api/trabajadores'
@@ -86,16 +104,18 @@ app.get('/api/debug/db', async (req, res) => {
 
 function cargarRuta(rutaBase, archivoRuta) {
   try {
+    console.log(`Intentando cargar ruta: ${rutaBase} desde ${archivoRuta}`);
+
     const ruta = require(archivoRuta);
+
     app.use(rutaBase, ruta);
+
     console.log(`✓ Ruta cargada: ${rutaBase}`);
-    return true;
   } catch (error) {
     console.error(`✗ ERROR CARGANDO RUTA: ${rutaBase}`);
-    console.error(`  Archivo: ${archivoRuta}`);
-    console.error(`  Detalle: ${error.message}`);
-    console.error(`  Stack: ${error.stack}`);
-    return false;
+    console.error(`Archivo: ${archivoRuta}`);
+    console.error(`Detalle: ${error.message}`);
+    console.error(error.stack);
   }
 }
 
@@ -135,6 +155,7 @@ app.get('/pages/:page', (req, res) => {
 
 /* =====================================================
    RUTA NO ENCONTRADA
+   IMPORTANTE: siempre debe ir después de todas las rutas
 ===================================================== */
 
 app.use((req, res) => {
@@ -151,12 +172,4 @@ app.use((req, res) => {
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Servidor OficiosYA corriendo en puerto ${PORT}`);
-});
-app.get('/api/version', (req, res) => {
-  res.json({
-    ok: true,
-    version: 'auth-fix-14d427a',
-    fecha: '2026-06-02',
-    mensaje: 'Railway está usando el server.js corregido'
-  });
 });
