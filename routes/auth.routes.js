@@ -9,6 +9,8 @@ function usarFuncion(nombre) {
     return authController[nombre];
   }
 
+  console.error(`Falta función en auth.controller.js: ${nombre}`);
+
   return (req, res) => {
     return res.status(501).json({
       ok: false,
@@ -33,10 +35,10 @@ router.get('/verificar-email', usarFuncion('verificarCorreoQuery'));
 router.post('/reenviar-verificacion', usarFuncion('reenviarVerificacion'));
 router.post('/resend-verification', usarFuncion('reenviarVerificacion'));
 
-router.post('/change-password', verificarToken, usarFuncion('cambiarPassword'));
-
 router.post('/forgot-password', usarFuncion('solicitarResetPassword'));
 router.post('/reset-password', usarFuncion('resetPassword'));
+
+router.post('/change-password', verificarToken, usarFuncion('cambiarPassword'));
 
 router.get('/me', verificarToken, usarFuncion('me'));
 
