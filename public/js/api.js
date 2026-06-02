@@ -14,14 +14,23 @@ if (typeof window.API_URL === 'undefined') {
 function setSession(data) {
   if (!data) return;
 
-  localStorage.setItem('oficiosya_session', JSON.stringify(data));
+  let token = data.token || data?.data?.token || null;
+  let usuario = data.usuario || data?.data?.usuario || null;
 
-  if (data.token) {
-    localStorage.setItem('oficiosya_token', data.token);
+  const session = {
+    ...data,
+    token,
+    usuario
+  };
+
+  localStorage.setItem('oficiosya_session', JSON.stringify(session));
+
+  if (token) {
+    localStorage.setItem('oficiosya_token', token);
   }
 
-  if (data.usuario) {
-    localStorage.setItem('oficiosya_usuario', JSON.stringify(data.usuario));
+  if (usuario) {
+    localStorage.setItem('oficiosya_usuario', JSON.stringify(usuario));
   }
 }
 
@@ -245,7 +254,14 @@ async function apiFetch(endpoint, options = {}) {
   }
 
   if (!response.ok) {
-    throw new Error(data.mensaje || data.error || 'Error en la solicitud.');
+    const mensaje = data.mensaje || data.error || 'Error en la solicitud.';
+
+    if (response.status === 401 && /token|jwt|sesión|session/i.test(mensaje)) {
+      clearSession();
+      throw new Error('Tu sesión expiró o el token ya no es válido. Vuelve a iniciar sesión.');
+    }
+
+    throw new Error(mensaje);
   }
 
   return data;
@@ -257,31 +273,59 @@ async function apiFetch(endpoint, options = {}) {
 
 const Auth = {
   async login({ email, password }) {
-    return apiFetch('/auth/login', {
+    const data = await apiFetch('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password })
     });
+
+    if (data.token || data?.data?.token) {
+      setSession(data);
+    }
+
+    return data;
   },
 
   async register(datos) {
-    return apiFetch('/auth/register', {
+    const data = await apiFetch('/auth/register', {
       method: 'POST',
       body: JSON.stringify(datos)
     });
+
+    if (data.token || data?.data?.token) {
+      setSession(data);
+    }
+
+    return data;
+  },
+
+  async registro(datos) {
+    return this.register(datos);
   },
 
   async googleLogin(credential) {
-    return apiFetch('/auth/google', {
+    const data = await apiFetch('/auth/google', {
       method: 'POST',
       body: JSON.stringify({ credential })
     });
+
+    if (data.token || data?.data?.token) {
+      setSession(data);
+    }
+
+    return data;
   },
 
   async facebookLogin(accessToken) {
-    return apiFetch('/auth/facebook', {
+    const data = await apiFetch('/auth/facebook', {
       method: 'POST',
       body: JSON.stringify({ accessToken })
     });
+
+    if (data.token || data?.data?.token) {
+      setSession(data);
+    }
+
+    return data;
   },
 
   async verifyEmail(token, id = null) {
@@ -289,7 +333,7 @@ const Auth = {
       return apiFetch(`/auth/verify-email?token=${encodeURIComponent(token)}&id=${encodeURIComponent(id)}`);
     }
 
-    return apiFetch(`/auth/verificar/${encodeURIComponent(token)}`);
+    return apiFetch(`/auth/verify-email?token=${encodeURIComponent(token)}`);
   },
 
   async resendVerification(email) {
@@ -329,6 +373,10 @@ const Auth = {
       method: 'POST',
       body: JSON.stringify(body)
     });
+  },
+
+  async me() {
+    return apiFetch('/auth/me');
   }
 };
 
@@ -363,11 +411,23 @@ const Perfil = {
     return apiFetch('/perfil/profesional');
   },
 
+  async trabajador() {
+    return apiFetch('/perfil/trabajador');
+  },
+
   async actualizarProfesional(datos) {
     return apiFetch('/perfil/profesional', {
       method: 'PUT',
       body: JSON.stringify(datos)
     });
+  },
+
+  async guardarProfesional(datos) {
+    return this.actualizarProfesional(datos);
+  },
+
+  async crearActualizarProfesional(datos) {
+    return this.actualizarProfesional(datos);
   },
 
   async verificaciones() {
@@ -387,7 +447,7 @@ const Perfil = {
 
   async publico(id) {
     const data = await apiFetch(`/perfil/${id}`);
-    return data.perfil || data.usuario || data.trabajador || data;
+    return data.perfil || data.usuario || data.trabajador || data.data || data;
   }
 };
 
@@ -398,7 +458,7 @@ const Perfil = {
 const Solicitudes = {
   async categorias() {
     const data = await apiFetch('/solicitudes/categorias');
-    const categorias = data.categorias || data || [];
+    const categorias = data.categorias || data.data || data || [];
 
     if (Array.isArray(categorias)) {
       categorias.categorias = categorias;
@@ -409,17 +469,17 @@ const Solicitudes = {
 
   async listarAbiertas() {
     const data = await apiFetch('/solicitudes/abiertas');
-    return data.solicitudes || data || [];
+    return data.solicitudes || data.data || data || [];
   },
 
   async misSolicitudes() {
     const data = await apiFetch('/solicitudes/mias/todas');
-    return data.solicitudes || data || [];
+    return data.solicitudes || data.data || data || [];
   },
 
   async detalle(id) {
     const data = await apiFetch(`/solicitudes/${id}`);
-    return data.solicitud || data;
+    return data.solicitud || data.data || data;
   },
 
   async crear(datos) {
@@ -486,7 +546,7 @@ const Solicitudes = {
 
   async verPostulaciones(id) {
     const data = await apiFetch(`/solicitudes/${id}/postulaciones`);
-    return data.postulaciones || data || [];
+    return data.postulaciones || data.data || data || [];
   },
 
   async gestionarPostulacion(postulacionId, estado) {
@@ -508,17 +568,17 @@ const Solicitudes = {
 const Trabajadores = {
   async listar() {
     const data = await apiFetch('/trabajadores');
-    return data.trabajadores || data.profesionales || data || [];
+    return data.trabajadores || data.profesionales || data.data || data || [];
   },
 
   async profesionales() {
     const data = await apiFetch('/trabajadores/profesionales');
-    return data.trabajadores || data.profesionales || data || [];
+    return data.trabajadores || data.profesionales || data.data || data || [];
   },
 
   async detalle(id) {
     const data = await apiFetch(`/trabajadores/${id}`);
-    return data.trabajador || data.profesional || data.perfil || data;
+    return data.trabajador || data.profesional || data.perfil || data.data || data;
   }
 };
 
@@ -536,12 +596,12 @@ const Calificaciones = {
 
   async recibidas(usuarioId) {
     const data = await apiFetch(`/calificaciones/usuario/${usuarioId}`);
-    return data.calificaciones || data || [];
+    return data.calificaciones || data.data || data || [];
   },
 
   async porSolicitud(solicitudId) {
     const data = await apiFetch(`/calificaciones/solicitud/${solicitudId}`);
-    return data.calificacion || null;
+    return data.calificacion || data.data || null;
   }
 };
 
@@ -552,7 +612,7 @@ const Calificaciones = {
 const Admin = {
   async resumen() {
     const data = await apiFetch('/admin/resumen');
-    return data.resumen || data;
+    return data.resumen || data.data || data;
   },
 
   async usuarios(page = 1, limit = 20) {
@@ -620,7 +680,7 @@ const Chat = {
 const Notificaciones = {
   async listar() {
     const data = await apiFetch('/notificaciones');
-    return data.notificaciones || [];
+    return data.notificaciones || data.data || [];
   },
 
   async marcarLeida(id) {
@@ -673,18 +733,32 @@ const Stats = {
   },
 
   async misStats() {
-    const data = await apiFetch('/stats');
-    const stats = data.stats || data || {};
+    try {
+      const data = await apiFetch('/stats');
+      const stats = data.stats || data.data || data || {};
 
-    return {
-      solicitudes_activas: Number(stats.solicitudes_activas ?? stats.solicitudes ?? 0),
-      servicios_completados: Number(stats.servicios_completados ?? stats.trabajos ?? 0),
-      calificacion_promedio: Number(stats.calificacion_promedio ?? stats.promedio ?? 0).toFixed(1),
-      postulaciones_enviadas: Number(stats.postulaciones_enviadas ?? stats.postulaciones ?? 0),
-      mensajes: Number(stats.mensajes ?? 0),
-      trabajos: Number(stats.trabajos ?? stats.servicios_completados ?? 0),
-      raw: stats
-    };
+      return {
+        solicitudes_activas: Number(stats.solicitudes_activas ?? stats.solicitudes ?? 0),
+        servicios_completados: Number(stats.servicios_completados ?? stats.trabajos ?? 0),
+        calificacion_promedio: Number(stats.calificacion_promedio ?? stats.promedio ?? 0).toFixed(1),
+        postulaciones_enviadas: Number(stats.postulaciones_enviadas ?? stats.postulaciones ?? 0),
+        mensajes: Number(stats.mensajes ?? 0),
+        trabajos: Number(stats.trabajos ?? stats.servicios_completados ?? 0),
+        raw: stats
+      };
+    } catch (error) {
+      console.warn('No se pudieron cargar estadísticas:', error.message);
+
+      return {
+        solicitudes_activas: 0,
+        servicios_completados: 0,
+        calificacion_promedio: '0.0',
+        postulaciones_enviadas: 0,
+        mensajes: 0,
+        trabajos: 0,
+        raw: {}
+      };
+    }
   }
 };
 
@@ -713,6 +787,10 @@ const Trabajos = {
     });
   },
 
+  async crear(formData) {
+    return this.subir(formData);
+  },
+
   async eliminar(id) {
     return apiFetch(`/trabajos/${id}`, {
       method: 'DELETE'
@@ -721,7 +799,7 @@ const Trabajos = {
 
   async detalle(id) {
     const data = await apiFetch(`/trabajos/${id}`);
-    return data.trabajo || data;
+    return data.trabajo || data.data || data;
   }
 };
 
