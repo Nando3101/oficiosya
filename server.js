@@ -119,6 +119,48 @@ cargarRuta('/api/chat', './routes/chat.routes');
 cargarRuta('/api/notificaciones', './routes/notificacion.routes');
 cargarRuta('/api/estado', './routes/estado.routes');
 
+const { pgPool } = require('./config/db');
+
+app.get('/api/debug/db', async (req, res) => {
+  try {
+    const db = await pgPool.query(`
+      SELECT current_database() AS database,
+             current_user AS user,
+             inet_server_addr() AS host,
+             inet_server_port() AS port
+    `);
+
+    const tablas = await pgPool.query(`
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+      ORDER BY table_name
+    `);
+
+    const categorias = await pgPool.query(`
+      SELECT COUNT(*) AS total FROM categorias
+    `).catch(error => ({ rows: [{ total: 'ERROR: ' + error.message }] }));
+
+    const usuarios = await pgPool.query(`
+      SELECT COUNT(*) AS total FROM usuarios
+    `).catch(error => ({ rows: [{ total: 'ERROR: ' + error.message }] }));
+
+    res.json({
+      ok: true,
+      conexion: db.rows[0],
+      tablas: tablas.rows,
+      total_categorias: categorias.rows[0].total,
+      total_usuarios: usuarios.rows[0].total
+    });
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      mensaje: 'Error verificando base de datos',
+      error: error.message
+    });
+  }
+});
+
 app.get('/api', (req, res) => {
   res.json({
     ok: true,
