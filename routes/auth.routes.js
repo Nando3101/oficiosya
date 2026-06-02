@@ -4,36 +4,40 @@ const router = express.Router();
 const authController = require('../controllers/auth.controller');
 const { verificarToken } = require('../middlewares/auth.middleware');
 
-// Registro
-router.post('/registro', authController.registro);
-router.post('/register', authController.registro);
+function usarFuncion(nombre) {
+  if (typeof authController[nombre] === 'function') {
+    return authController[nombre];
+  }
 
-// Login
-router.post('/login', authController.login);
+  return (req, res) => {
+    return res.status(501).json({
+      ok: false,
+      mensaje: `La función ${nombre} no está implementada en auth.controller.js`
+    });
+  };
+}
 
-// FIX: ruta de Google login que el frontend llama pero no existía en el backend
-router.post('/google', authController.googleLogin);
+router.post('/registro', usarFuncion('registro'));
+router.post('/register', usarFuncion('registro'));
 
-// Verificación de correo por ruta (token en URL)
-router.get('/verificar/:token', authController.verificarCorreo);
-router.get('/verify/:token', authController.verificarCorreo);
+router.post('/login', usarFuncion('login'));
 
-// FIX: rutas que llamaban a verificarCorreoQuery, función que no existía
-router.get('/verify-email', authController.verificarCorreoQuery);
-router.get('/verificar-email', authController.verificarCorreoQuery);
+router.post('/google', usarFuncion('googleLogin'));
 
-// Reenviar verificación
-router.post('/reenviar-verificacion', authController.reenviarVerificacion);
-router.post('/resend-verification', authController.reenviarVerificacion);
+router.get('/verificar/:token', usarFuncion('verificarCorreo'));
+router.get('/verify/:token', usarFuncion('verificarCorreo'));
 
-// FIX: ruta que llamaba a cambiarPassword, función que no existía
-router.post('/change-password', verificarToken, authController.cambiarPassword);
+router.get('/verify-email', usarFuncion('verificarCorreoQuery'));
+router.get('/verificar-email', usarFuncion('verificarCorreoQuery'));
 
-// Recuperar contraseña
-router.post('/forgot-password', authController.solicitarResetPassword);
-router.post('/reset-password', authController.resetPassword);
+router.post('/reenviar-verificacion', usarFuncion('reenviarVerificacion'));
+router.post('/resend-verification', usarFuncion('reenviarVerificacion'));
 
-// Usuario autenticado
-router.get('/me', verificarToken, authController.me);
+router.post('/change-password', verificarToken, usarFuncion('cambiarPassword'));
+
+router.post('/forgot-password', usarFuncion('solicitarResetPassword'));
+router.post('/reset-password', usarFuncion('resetPassword'));
+
+router.get('/me', verificarToken, usarFuncion('me'));
 
 module.exports = router;
