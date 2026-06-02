@@ -19,6 +19,26 @@ function usarFuncion(nombre) {
   };
 }
 
+router.get('/debug', (req, res) => {
+  res.json({
+    ok: true,
+    mensaje: 'Rutas de autenticación cargadas correctamente.',
+    rutas: [
+      'POST /api/auth/registro',
+      'POST /api/auth/register',
+      'POST /api/auth/login',
+      'POST /api/auth/google',
+      'GET /api/auth/verify-email',
+      'GET /api/auth/verificar/:token',
+      'POST /api/auth/reenviar-verificacion',
+      'POST /api/auth/forgot-password',
+      'POST /api/auth/reset-password',
+      'POST /api/auth/change-password',
+      'GET /api/auth/me'
+    ]
+  });
+});
+
 router.post('/registro', usarFuncion('registro'));
 router.post('/register', usarFuncion('registro'));
 

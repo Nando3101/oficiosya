@@ -291,7 +291,7 @@ const Auth = {
   },
 
   async register(datos) {
-    const data = await apiFetch('/auth/register', {
+    const data = await apiFetch('/auth/registro', {
       method: 'POST',
       body: JSON.stringify(datos)
     });
