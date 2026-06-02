@@ -1,11 +1,17 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
-const connectionString = process.env.DATABASE_URL;
+const connectionString =
+  process.env.DATABASE_URL ||
+  process.env.POSTGRES_URL ||
+  process.env.DATABASE_PRIVATE_URL ||
+  process.env.POSTGRES_PRIVATE_URL ||
+  process.env.DATABASE_PUBLIC_URL ||
+  process.env.POSTGRES_PUBLIC_URL;
 
 if (!connectionString) {
-  console.error('ERROR: Falta DATABASE_URL.');
-  console.error('Configura DATABASE_URL en Railway → servicio oficiosya → Variables.');
+  console.error('ERROR: Falta DATABASE_URL o POSTGRES_URL.');
+  console.error('Configura la variable en Railway → servicio oficiosya → Variables.');
   process.exit(1);
 }
 
@@ -51,7 +57,6 @@ function normalizeParams(query, paramsByName) {
   const text = query.replace(/@([A-Za-z_][A-Za-z0-9_]*)/g, (_, name) => {
     if (!positions.has(name)) {
       positions.set(name, values.length + 1);
-
       values.push(
         Object.prototype.hasOwnProperty.call(paramsByName, name)
           ? paramsByName[name]
@@ -71,7 +76,6 @@ function convertTop(query) {
   if (!match) return query;
 
   const limit = match[1];
-
   let converted = query.replace(/^\s*SELECT\s+TOP\s+\d+\s+/i, 'SELECT ');
 
   if (!/\bLIMIT\b/i.test(converted)) {
