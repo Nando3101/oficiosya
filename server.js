@@ -129,6 +129,7 @@ function cargarRuta(ruta, archivo) {
 ===================================================== */
 
 cargarRuta('/api/auth', './routes/auth.routes');
+cargarRuta('/auth', './routes/auth.routes');
 cargarRuta('/api/perfil', './routes/perfil.routes');
 cargarRuta('/api/solicitudes', './routes/solicitud.routes');
 cargarRuta('/api/trabajadores', './routes/trabajador.routes');
