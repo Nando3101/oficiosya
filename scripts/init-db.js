@@ -147,50 +147,6 @@ async function insertarDatosIniciales() {
     ON CONFLICT (usuario_id) DO NOTHING;
   `);
 
-  await pgPool.query(`
-    INSERT INTO solicitudes (
-      cliente_id, categoria_id, titulo, descripcion, presupuesto,
-      urgencia, zona, ciudad, direccion, estado, estado_recorrido
-    )
-    SELECT u.id, c.id,
-           'Reparar fuga de agua',
-           'Necesito reparar una fuga de agua en el baño principal.',
-           25.00,
-           'media',
-           'Centro',
-           'Ambato',
-           'Av. Cevallos y Mera',
-           'abierta',
-           'pendiente'
-    FROM usuarios u, categorias c
-    WHERE u.email = 'fernando@oficiosya.com'
-      AND c.nombre = 'Plomería'
-      AND NOT EXISTS (
-        SELECT 1 FROM solicitudes WHERE titulo = 'Reparar fuga de agua'
-      );
-
-    INSERT INTO solicitudes (
-      cliente_id, categoria_id, titulo, descripcion, presupuesto,
-      urgencia, zona, ciudad, direccion, estado, estado_recorrido
-    )
-    SELECT u.id, c.id,
-           'Instalar tomacorriente',
-           'Necesito instalar un tomacorriente nuevo en la sala.',
-           18.00,
-           'baja',
-           'Norte',
-           'Ambato',
-           'Sector Ficoa',
-           'abierta',
-           'pendiente'
-    FROM usuarios u, categorias c
-    WHERE u.email = 'fernando@oficiosya.com'
-      AND c.nombre = 'Electricidad'
-      AND NOT EXISTS (
-        SELECT 1 FROM solicitudes WHERE titulo = 'Instalar tomacorriente'
-      );
-  `);
-
   console.log('Datos iniciales insertados correctamente.');
 }
 

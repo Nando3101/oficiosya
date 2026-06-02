@@ -96,45 +96,6 @@ CREATE TABLE IF NOT EXISTS postulaciones (
     UNIQUE (solicitud_id, trabajador_id)
 );
 
-CREATE TABLE IF NOT EXISTS servicios (
-    id SERIAL PRIMARY KEY,
-    solicitud_id INTEGER REFERENCES solicitudes(id) ON DELETE CASCADE,
-    trabajador_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
-    cliente_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
-    titulo VARCHAR(150),
-    descripcion TEXT,
-    precio_final DECIMAL(10,2),
-    estado VARCHAR(40) NOT NULL DEFAULT 'pendiente',
-    createdat TIMESTAMP NOT NULL DEFAULT NOW(),
-    updatedat TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS trabajos (
-    id SERIAL PRIMARY KEY,
-    solicitud_id INTEGER REFERENCES solicitudes(id) ON DELETE CASCADE,
-    trabajador_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
-    cliente_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
-    descripcion TEXT,
-    fecha_inicio TIMESTAMP,
-    fecha_fin TIMESTAMP,
-    estado VARCHAR(40) NOT NULL DEFAULT 'en_curso',
-    createdat TIMESTAMP NOT NULL DEFAULT NOW(),
-    updatedat TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS trabajos_realizados (
-    id SERIAL PRIMARY KEY,
-    solicitud_id INTEGER REFERENCES solicitudes(id) ON DELETE CASCADE,
-    trabajador_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
-    cliente_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
-    descripcion TEXT,
-    fecha_inicio TIMESTAMP,
-    fecha_fin TIMESTAMP,
-    estado VARCHAR(40) NOT NULL DEFAULT 'en_curso',
-    createdat TIMESTAMP NOT NULL DEFAULT NOW(),
-    updatedat TIMESTAMP
-);
-
 CREATE TABLE IF NOT EXISTS calificaciones (
     id SERIAL PRIMARY KEY,
     solicitud_id INTEGER REFERENCES solicitudes(id) ON DELETE CASCADE,
@@ -187,6 +148,45 @@ CREATE TABLE IF NOT EXISTS imagenes (
     thumb_url VARCHAR(500),
     tipo VARCHAR(50),
     createdat TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS servicios (
+    id SERIAL PRIMARY KEY,
+    solicitud_id INTEGER REFERENCES solicitudes(id) ON DELETE CASCADE,
+    trabajador_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+    cliente_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+    titulo VARCHAR(150),
+    descripcion TEXT,
+    precio_final DECIMAL(10,2),
+    estado VARCHAR(40) NOT NULL DEFAULT 'pendiente',
+    createdat TIMESTAMP NOT NULL DEFAULT NOW(),
+    updatedat TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS trabajos (
+    id SERIAL PRIMARY KEY,
+    solicitud_id INTEGER REFERENCES solicitudes(id) ON DELETE CASCADE,
+    trabajador_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+    cliente_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+    descripcion TEXT,
+    fecha_inicio TIMESTAMP,
+    fecha_fin TIMESTAMP,
+    estado VARCHAR(40) NOT NULL DEFAULT 'en_curso',
+    createdat TIMESTAMP NOT NULL DEFAULT NOW(),
+    updatedat TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS trabajos_realizados (
+    id SERIAL PRIMARY KEY,
+    solicitud_id INTEGER REFERENCES solicitudes(id) ON DELETE CASCADE,
+    trabajador_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+    cliente_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+    descripcion TEXT,
+    fecha_inicio TIMESTAMP,
+    fecha_fin TIMESTAMP,
+    estado VARCHAR(40) NOT NULL DEFAULT 'en_curso',
+    createdat TIMESTAMP NOT NULL DEFAULT NOW(),
+    updatedat TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS reportes (
