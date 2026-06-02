@@ -1,32 +1,37 @@
-const { sql, poolPromise } = require('../config/db');
+// FIX: reemplazado completamente de mssql (poolPromise, sql.Int, GETDATE(),
+// OUTPUT INSERTED.*, result.recordset) a pgPool nativo de PostgreSQL.
+const { pgPool } = require('../config/db');
+
+/* =====================================================
+   RESUMEN GENERAL
+===================================================== */
 
 exports.resumen = async (req, res) => {
   try {
-    const pool = await poolPromise;
-
-    const result = await pool.request().query(`
+    const result = await pgPool.query(`
       SELECT
-        (SELECT COUNT(*) FROM usuarios) AS total_usuarios,
-        (SELECT COUNT(*) FROM usuarios WHERE rol = 'cliente' OR es_cliente = 1) AS total_clientes,
+        (SELECT COUNT(*) FROM usuarios)                                              AS total_usuarios,
+        (SELECT COUNT(*) FROM usuarios WHERE rol = 'cliente' OR es_cliente = 1)     AS total_clientes,
         (SELECT COUNT(*) FROM usuarios WHERE rol = 'trabajador' OR es_trabajador = 1) AS total_trabajadores,
-        (SELECT COUNT(*) FROM solicitudes) AS total_solicitudes,
-        (SELECT COUNT(*) FROM solicitudes WHERE estado = 'abierta') AS solicitudes_abiertas,
-        (SELECT COUNT(*) FROM solicitudes WHERE estado = 'confirmada') AS solicitudes_confirmadas,
-        (SELECT COUNT(*) FROM solicitudes WHERE estado = 'en_curso') AS solicitudes_en_curso,
-        (SELECT COUNT(*) FROM solicitudes WHERE estado = 'finalizada') AS solicitudes_finalizadas,
-        (SELECT COUNT(*) FROM solicitudes WHERE estado = 'cancelada') AS solicitudes_canceladas,
-        (SELECT COUNT(*) FROM postulaciones) AS total_postulaciones,
-        (SELECT COUNT(*) FROM calificaciones) AS total_calificaciones,
-        (SELECT COUNT(*) FROM verificaciones WHERE estado = 'pendiente') AS verificaciones_pendientes
+        (SELECT COUNT(*) FROM solicitudes)                                           AS total_solicitudes,
+        (SELECT COUNT(*) FROM solicitudes WHERE estado = 'abierta')                 AS solicitudes_abiertas,
+        (SELECT COUNT(*) FROM solicitudes WHERE estado = 'confirmada')              AS solicitudes_confirmadas,
+        (SELECT COUNT(*) FROM solicitudes WHERE estado = 'en_curso')                AS solicitudes_en_curso,
+        (SELECT COUNT(*) FROM solicitudes WHERE estado = 'finalizada')              AS solicitudes_finalizadas,
+        (SELECT COUNT(*) FROM solicitudes WHERE estado = 'cancelada')               AS solicitudes_canceladas,
+        (SELECT COUNT(*) FROM postulaciones)                                         AS total_postulaciones,
+        (SELECT COUNT(*) FROM calificaciones)                                        AS total_calificaciones,
+        (SELECT COUNT(*) FROM verificaciones WHERE estado = 'pendiente')            AS verificaciones_pendientes
     `);
 
-    res.json({
+    return res.json({
       ok: true,
-      resumen: result.recordset[0]
+      resumen: result.rows[0]
     });
-
   } catch (error) {
-    res.status(500).json({
+    console.error('Error en resumen admin:', error);
+
+    return res.status(500).json({
       ok: false,
       mensaje: 'Error al cargar resumen administrativo.',
       error: error.message
@@ -34,11 +39,13 @@ exports.resumen = async (req, res) => {
   }
 };
 
+/* =====================================================
+   LISTAR USUARIOS
+===================================================== */
+
 exports.listarUsuarios = async (req, res) => {
   try {
-    const pool = await poolPromise;
-
-    const result = await pool.request().query(`
+    const result = await pgPool.query(`
       SELECT
         id,
         nombres,
@@ -59,13 +66,14 @@ exports.listarUsuarios = async (req, res) => {
       ORDER BY createdat DESC
     `);
 
-    res.json({
+    return res.json({
       ok: true,
-      usuarios: result.recordset
+      usuarios: result.rows
     });
-
   } catch (error) {
-    res.status(500).json({
+    console.error('Error listando usuarios:', error);
+
+    return res.status(500).json({
       ok: false,
       mensaje: 'Error al cargar usuarios.',
       error: error.message
@@ -73,11 +81,13 @@ exports.listarUsuarios = async (req, res) => {
   }
 };
 
+/* =====================================================
+   LISTAR SOLICITUDES
+===================================================== */
+
 exports.listarSolicitudes = async (req, res) => {
   try {
-    const pool = await poolPromise;
-
-    const result = await pool.request().query(`
+    const result = await pgPool.query(`
       SELECT
         s.id,
         s.titulo,
@@ -89,25 +99,26 @@ exports.listarSolicitudes = async (req, res) => {
         s.ciudad,
         s.createdat,
         s.updatedat,
-        c.nombre AS categoria,
-        CONCAT(cli.nombres, ' ', cli.apellidos) AS cliente,
-        cli.email AS correo_cliente,
-        CONCAT(t.nombres, ' ', t.apellidos) AS trabajador,
-        t.email AS correo_trabajador
+        c.nombre                                        AS categoria,
+        CONCAT(cli.nombres, ' ', cli.apellidos)        AS cliente,
+        cli.email                                       AS correo_cliente,
+        CONCAT(t.nombres, ' ', t.apellidos)            AS trabajador,
+        t.email                                         AS correo_trabajador
       FROM solicitudes s
-      LEFT JOIN categorias c ON c.id = s.categoria_id
-      LEFT JOIN usuarios cli ON cli.id = s.cliente_id
-      LEFT JOIN usuarios t ON t.id = s.trabajador_id
+      LEFT JOIN categorias c   ON c.id  = s.categoria_id
+      LEFT JOIN usuarios cli   ON cli.id = s.cliente_id
+      LEFT JOIN usuarios t     ON t.id   = s.trabajador_id
       ORDER BY s.createdat DESC
     `);
 
-    res.json({
+    return res.json({
       ok: true,
-      solicitudes: result.recordset
+      solicitudes: result.rows
     });
-
   } catch (error) {
-    res.status(500).json({
+    console.error('Error listando solicitudes:', error);
+
+    return res.status(500).json({
       ok: false,
       mensaje: 'Error al cargar solicitudes.',
       error: error.message
@@ -115,18 +126,20 @@ exports.listarSolicitudes = async (req, res) => {
   }
 };
 
+/* =====================================================
+   LISTAR POSTULACIONES
+===================================================== */
+
 exports.listarPostulaciones = async (req, res) => {
   try {
-    const pool = await poolPromise;
-
-    const result = await pool.request().query(`
+    const result = await pgPool.query(`
       SELECT
         p.id,
         p.solicitud_id,
-        s.titulo AS solicitud,
+        s.titulo                                       AS solicitud,
         p.trabajador_id,
-        CONCAT(u.nombres, ' ', u.apellidos) AS trabajador,
-        u.email AS correo_trabajador,
+        CONCAT(u.nombres, ' ', u.apellidos)           AS trabajador,
+        u.email                                        AS correo_trabajador,
         p.mensaje,
         p.precio_ofertado,
         p.disponibilidad,
@@ -135,17 +148,18 @@ exports.listarPostulaciones = async (req, res) => {
         p.updatedat
       FROM postulaciones p
       INNER JOIN solicitudes s ON s.id = p.solicitud_id
-      INNER JOIN usuarios u ON u.id = p.trabajador_id
+      INNER JOIN usuarios u    ON u.id = p.trabajador_id
       ORDER BY p.createdat DESC
     `);
 
-    res.json({
+    return res.json({
       ok: true,
-      postulaciones: result.recordset
+      postulaciones: result.rows
     });
-
   } catch (error) {
-    res.status(500).json({
+    console.error('Error listando postulaciones:', error);
+
+    return res.status(500).json({
       ok: false,
       mensaje: 'Error al cargar postulaciones.',
       error: error.message
@@ -153,34 +167,37 @@ exports.listarPostulaciones = async (req, res) => {
   }
 };
 
+/* =====================================================
+   LISTAR CALIFICACIONES
+===================================================== */
+
 exports.listarCalificaciones = async (req, res) => {
   try {
-    const pool = await poolPromise;
-
-    const result = await pool.request().query(`
+    const result = await pgPool.query(`
       SELECT
         c.id,
         c.solicitud_id,
-        s.titulo AS solicitud,
+        s.titulo                                              AS solicitud,
         c.puntuacion,
         c.comentario,
         CONCAT(calificador.nombres, ' ', calificador.apellidos) AS calificador,
-        CONCAT(calificado.nombres, ' ', calificado.apellidos) AS calificado,
+        CONCAT(calificado.nombres,  ' ', calificado.apellidos)  AS calificado,
         c.createdat
       FROM calificaciones c
-      LEFT JOIN solicitudes s ON s.id = c.solicitud_id
-      LEFT JOIN usuarios calificador ON calificador.id = c.calificador_id
-      LEFT JOIN usuarios calificado ON calificado.id = c.calificado_id
+      LEFT JOIN solicitudes s          ON s.id         = c.solicitud_id
+      LEFT JOIN usuarios calificador   ON calificador.id = c.calificador_id
+      LEFT JOIN usuarios calificado    ON calificado.id  = c.calificado_id
       ORDER BY c.createdat DESC
     `);
 
-    res.json({
+    return res.json({
       ok: true,
-      calificaciones: result.recordset
+      calificaciones: result.rows
     });
-
   } catch (error) {
-    res.status(500).json({
+    console.error('Error listando calificaciones:', error);
+
+    return res.status(500).json({
       ok: false,
       mensaje: 'Error al cargar calificaciones.',
       error: error.message
@@ -188,11 +205,13 @@ exports.listarCalificaciones = async (req, res) => {
   }
 };
 
+/* =====================================================
+   LISTAR VERIFICACIONES
+===================================================== */
+
 exports.listarVerificaciones = async (req, res) => {
   try {
-    const pool = await poolPromise;
-
-    const result = await pool.request().query(`
+    const result = await pgPool.query(`
       SELECT
         v.id,
         v.usuario_id,
@@ -208,13 +227,14 @@ exports.listarVerificaciones = async (req, res) => {
       ORDER BY v.createdat DESC
     `);
 
-    res.json({
+    return res.json({
       ok: true,
-      verificaciones: result.recordset
+      verificaciones: result.rows
     });
-
   } catch (error) {
-    res.status(500).json({
+    console.error('Error listando verificaciones:', error);
+
+    return res.status(500).json({
       ok: false,
       mensaje: 'Error al cargar verificaciones.',
       error: error.message
@@ -222,32 +242,47 @@ exports.listarVerificaciones = async (req, res) => {
   }
 };
 
+/* =====================================================
+   CAMBIAR ESTADO DE USUARIO
+   FIX: antes usaba sql.Int, sql.Bit, GETDATE(), OUTPUT INSERTED.*
+   Ahora usa pgPool con parámetros posicionales $1/$2 y RETURNING.
+===================================================== */
+
 exports.cambiarEstadoUsuario = async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = Number(req.params.id);
     const { estado } = req.body;
 
-    const pool = await poolPromise;
+    // Aceptar true/false, 1/0, "1"/"0"
+    const estadoNormalizado = (estado === true || estado === 1 || estado === '1') ? 1 : 0;
 
-    const result = await pool.request()
-      .input('id', sql.Int, Number(id))
-      .input('estado', sql.Bit, estado ? 1 : 0)
-      .query(`
-        UPDATE usuarios
-        SET estado = @estado,
-            updatedat = GETDATE()
-        OUTPUT INSERTED.id, INSERTED.nombres, INSERTED.apellidos, INSERTED.email, INSERTED.estado
-        WHERE id = @id
-      `);
+    const result = await pgPool.query(
+      `
+      UPDATE usuarios
+      SET estado    = $1,
+          updatedat = NOW()
+      WHERE id = $2
+      RETURNING id, nombres, apellidos, email, estado
+      `,
+      [estadoNormalizado, id]
+    );
 
-    res.json({
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        ok: false,
+        mensaje: 'Usuario no encontrado.'
+      });
+    }
+
+    return res.json({
       ok: true,
       mensaje: 'Estado de usuario actualizado.',
-      usuario: result.recordset[0]
+      usuario: result.rows[0]
     });
-
   } catch (error) {
-    res.status(500).json({
+    console.error('Error cambiando estado de usuario:', error);
+
+    return res.status(500).json({
       ok: false,
       mensaje: 'Error al actualizar usuario.',
       error: error.message
@@ -255,52 +290,65 @@ exports.cambiarEstadoUsuario = async (req, res) => {
   }
 };
 
+/* =====================================================
+   GESTIONAR VERIFICACIÓN
+   FIX: antes usaba sql.Int, sql.VarChar, GETDATE(), OUTPUT INSERTED.*
+   Ahora usa pgPool con parámetros posicionales $1/$2/$3 y RETURNING.
+===================================================== */
+
 exports.gestionarVerificacion = async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = Number(req.params.id);
     const { estado, observacion } = req.body;
 
     if (!['pendiente', 'aprobada', 'rechazada'].includes(estado)) {
       return res.status(400).json({
         ok: false,
-        mensaje: 'Estado de verificación no válido.'
+        mensaje: 'Estado de verificación no válido. Use: pendiente, aprobada o rechazada.'
       });
     }
 
-    const pool = await poolPromise;
+    const result = await pgPool.query(
+      `
+      UPDATE verificaciones
+      SET estado      = $1,
+          observacion = $2,
+          updatedat   = NOW()
+      WHERE id = $3
+      RETURNING *
+      `,
+      [estado, observacion || null, id]
+    );
 
-    const result = await pool.request()
-      .input('id', sql.Int, Number(id))
-      .input('estado', sql.VarChar(30), estado)
-      .input('observacion', sql.VarChar(sql.MAX), observacion || null)
-      .query(`
-        UPDATE verificaciones
-        SET estado = @estado,
-            observacion = @observacion,
-            updatedat = GETDATE()
-        OUTPUT INSERTED.*
-        WHERE id = @id
-      `);
-
-    if (estado === 'aprobada' && result.recordset[0]) {
-      await pool.request()
-        .input('usuario_id', sql.Int, result.recordset[0].usuario_id)
-        .query(`
-          UPDATE usuarios
-          SET verificado = 1,
-              updatedat = GETDATE()
-          WHERE id = @usuario_id
-        `);
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        ok: false,
+        mensaje: 'Verificación no encontrada.'
+      });
     }
 
-    res.json({
+    // Si se aprueba, marcar al usuario como verificado
+    if (estado === 'aprobada') {
+      await pgPool.query(
+        `
+        UPDATE usuarios
+        SET verificado = 1,
+            updatedat  = NOW()
+        WHERE id = $1
+        `,
+        [result.rows[0].usuario_id]
+      );
+    }
+
+    return res.json({
       ok: true,
       mensaje: 'Verificación actualizada correctamente.',
-      verificacion: result.recordset[0]
+      verificacion: result.rows[0]
     });
-
   } catch (error) {
-    res.status(500).json({
+    console.error('Error gestionando verificación:', error);
+
+    return res.status(500).json({
       ok: false,
       mensaje: 'Error al gestionar verificación.',
       error: error.message
