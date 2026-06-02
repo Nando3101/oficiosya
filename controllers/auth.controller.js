@@ -2,7 +2,10 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
+const { OAuth2Client } = require('google-auth-library');
 const { pgPool } = require('../config/db');
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 function generarToken(usuario) {
   return jwt.sign(
@@ -56,9 +59,7 @@ async function enviarCorreoVerificacion(email, token) {
 
   if (!transporter) return;
 
-  const frontendUrl =
-    process.env.FRONTEND_URL || 'http://localhost:3000';
-
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
   const link = `${frontendUrl}/api/auth/verificar/${token}`;
 
   await transporter.sendMail({
@@ -75,6 +76,10 @@ async function enviarCorreoVerificacion(email, token) {
     `
   });
 }
+
+/* =====================================================
+   REGISTRO
+===================================================== */
 
 exports.registro = async (req, res) => {
   try {
@@ -197,6 +202,10 @@ exports.registro = async (req, res) => {
   }
 };
 
+/* =====================================================
+   LOGIN
+===================================================== */
+
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -277,6 +286,148 @@ exports.login = async (req, res) => {
   }
 };
 
+/* =====================================================
+   GOOGLE LOGIN
+   FIX: función faltante — el frontend llama a /auth/google
+   pero no existía implementación en este controlador.
+===================================================== */
+
+exports.googleLogin = async (req, res) => {
+  try {
+    const { credential } = req.body;
+
+    if (!credential) {
+      return res.status(400).json({
+        ok: false,
+        mensaje: 'Credencial de Google no proporcionada.'
+      });
+    }
+
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      return res.status(500).json({
+        ok: false,
+        mensaje: 'Google login no está configurado en el servidor.'
+      });
+    }
+
+    // Verificar el token de Google
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID
+    });
+
+    const payload = ticket.getPayload();
+    const { sub: googleId, email, given_name: nombres, family_name: apellidos, picture: fotoUrl } = payload;
+
+    if (!email) {
+      return res.status(400).json({
+        ok: false,
+        mensaje: 'No se pudo obtener el correo de Google.'
+      });
+    }
+
+    // Buscar usuario existente por google_id o email
+    let result = await pgPool.query(
+      `
+      SELECT *
+      FROM usuarios
+      WHERE google_id = $1
+         OR LOWER(email) = LOWER($2)
+      LIMIT 1
+      `,
+      [googleId, email]
+    );
+
+    let usuarioDb;
+
+    if (result.rows.length > 0) {
+      // Actualizar datos de Google si ya existe
+      const updated = await pgPool.query(
+        `
+        UPDATE usuarios
+        SET google_id = $1,
+            provider = 'google',
+            foto_url = COALESCE(foto_url, $2),
+            ultima_conexion = NOW(),
+            estado_conexion = 'activo',
+            updatedat = NOW()
+        WHERE id = $3
+        RETURNING *
+        `,
+        [googleId, fotoUrl || null, result.rows[0].id]
+      );
+      usuarioDb = updated.rows[0];
+    } else {
+      // Crear nuevo usuario con Google
+      const inserted = await pgPool.query(
+        `
+        INSERT INTO usuarios (
+          nombres,
+          apellidos,
+          email,
+          google_id,
+          provider,
+          foto_url,
+          rol,
+          estado,
+          is_admin,
+          es_cliente,
+          es_trabajador,
+          email_verificado,
+          verificado,
+          estado_conexion,
+          ultima_conexion,
+          createdat,
+          updatedat
+        )
+        VALUES (
+          $1, $2, LOWER($3), $4, 'google', $5,
+          'cliente', 1, 0, 1, 0, 1, 1, 'activo', NOW(), NOW(), NOW()
+        )
+        RETURNING *
+        `,
+        [
+          nombres || email.split('@')[0],
+          apellidos || '',
+          email,
+          googleId,
+          fotoUrl || null
+        ]
+      );
+      usuarioDb = inserted.rows[0];
+    }
+
+    if (Number(usuarioDb.estado) !== 1) {
+      return res.status(403).json({
+        ok: false,
+        mensaje: 'Usuario inactivo.'
+      });
+    }
+
+    const usuario = limpiarUsuario(usuarioDb);
+    const token = generarToken(usuario);
+
+    return res.json({
+      ok: true,
+      mensaje: 'Inicio de sesión con Google correcto.',
+      usuario,
+      token
+    });
+  } catch (error) {
+    console.error('Error en Google login:', error);
+
+    return res.status(500).json({
+      ok: false,
+      mensaje: 'Error al iniciar sesión con Google.',
+      error: error.message
+    });
+  }
+};
+
+/* =====================================================
+   VERIFICAR CORREO (por parámetro de ruta)
+===================================================== */
+
 exports.verificarCorreo = async (req, res) => {
   try {
     const { token } = req.params;
@@ -315,6 +466,62 @@ exports.verificarCorreo = async (req, res) => {
     });
   }
 };
+
+/* =====================================================
+   VERIFICAR CORREO (por query string ?token=...)
+   FIX: función faltante — las rutas /verify-email y
+   /verificar-email llamaban a esta función que no existía.
+===================================================== */
+
+exports.verificarCorreoQuery = async (req, res) => {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      return res.status(400).json({
+        ok: false,
+        mensaje: 'Token no proporcionado.'
+      });
+    }
+
+    const result = await pgPool.query(
+      `
+      UPDATE usuarios
+      SET email_verificado = 1,
+          verificado = 1,
+          email_token = NULL,
+          updatedat = NOW()
+      WHERE email_token = $1
+      RETURNING id, email
+      `,
+      [token]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({
+        ok: false,
+        mensaje: 'Token inválido o expirado.'
+      });
+    }
+
+    return res.json({
+      ok: true,
+      mensaje: 'Correo verificado correctamente.'
+    });
+  } catch (error) {
+    console.error('Error verificando correo (query):', error);
+
+    return res.status(500).json({
+      ok: false,
+      mensaje: 'Error al verificar correo.',
+      error: error.message
+    });
+  }
+};
+
+/* =====================================================
+   REENVIAR VERIFICACIÓN
+===================================================== */
 
 exports.reenviarVerificacion = async (req, res) => {
   try {
@@ -373,6 +580,12 @@ exports.reenviarVerificacion = async (req, res) => {
   }
 };
 
+/* =====================================================
+   SOLICITAR RESET DE CONTRASEÑA
+   FIX: el link ahora apunta a /pages/nueva-password.html
+   que es la página que realmente existe en public/pages/.
+===================================================== */
+
 exports.solicitarResetPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -388,6 +601,7 @@ exports.solicitarResetPassword = async (req, res) => {
     );
 
     if (usuario.rows.length === 0) {
+      // Responder igual aunque no exista (evitar enumeración de correos)
       return res.json({
         ok: true,
         mensaje: 'Si el correo existe, se enviarán instrucciones.'
@@ -395,7 +609,7 @@ exports.solicitarResetPassword = async (req, res) => {
     }
 
     const resetToken = crypto.randomBytes(32).toString('hex');
-    const expiracion = new Date(Date.now() + 1000 * 60 * 30);
+    const expiracion = new Date(Date.now() + 1000 * 60 * 30); // 30 minutos
 
     await pgPool.query(
       `
@@ -411,10 +625,11 @@ exports.solicitarResetPassword = async (req, res) => {
     const transporter = crearTransporter();
 
     if (transporter) {
-      const frontendUrl =
-        process.env.FRONTEND_URL || 'http://localhost:3000';
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 
-      const link = `${frontendUrl}/reset-password.html?token=${resetToken}`;
+      // FIX: antes apuntaba a /reset-password.html que no existe.
+      // La página correcta es /pages/nueva-password.html
+      const link = `${frontendUrl}/pages/nueva-password.html?token=${resetToken}`;
 
       await transporter.sendMail({
         from:
@@ -426,6 +641,7 @@ exports.solicitarResetPassword = async (req, res) => {
           <h2>Recuperar contraseña</h2>
           <p>Haz clic en el siguiente enlace para cambiar tu contraseña:</p>
           <a href="${link}">${link}</a>
+          <p><small>Este enlace expira en 30 minutos.</small></p>
         `
       });
     }
@@ -444,6 +660,10 @@ exports.solicitarResetPassword = async (req, res) => {
     });
   }
 };
+
+/* =====================================================
+   RESETEAR CONTRASEÑA (con token del correo)
+===================================================== */
 
 exports.resetPassword = async (req, res) => {
   try {
@@ -502,6 +722,86 @@ exports.resetPassword = async (req, res) => {
     });
   }
 };
+
+/* =====================================================
+   CAMBIAR CONTRASEÑA (usuario autenticado)
+   FIX: función faltante — la ruta POST /change-password
+   llamaba a esta función que no existía en el controlador.
+===================================================== */
+
+exports.cambiarPassword = async (req, res) => {
+  try {
+    const usuarioId = req.user.id;
+    const { password_actual, password_nuevo } = req.body;
+
+    if (!password_actual || !password_nuevo) {
+      return res.status(400).json({
+        ok: false,
+        mensaje: 'La contraseña actual y la nueva son obligatorias.'
+      });
+    }
+
+    if (password_nuevo.length < 6) {
+      return res.status(400).json({
+        ok: false,
+        mensaje: 'La nueva contraseña debe tener al menos 6 caracteres.'
+      });
+    }
+
+    const result = await pgPool.query(
+      `SELECT password_hash FROM usuarios WHERE id = $1 LIMIT 1`,
+      [usuarioId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        ok: false,
+        mensaje: 'Usuario no encontrado.'
+      });
+    }
+
+    const passwordValido = await bcrypt.compare(
+      password_actual,
+      result.rows[0].password_hash
+    );
+
+    if (!passwordValido) {
+      return res.status(401).json({
+        ok: false,
+        mensaje: 'La contraseña actual es incorrecta.'
+      });
+    }
+
+    const nuevoHash = await bcrypt.hash(password_nuevo, 10);
+
+    await pgPool.query(
+      `
+      UPDATE usuarios
+      SET password_hash = $1,
+          updatedat = NOW()
+      WHERE id = $2
+      `,
+      [nuevoHash, usuarioId]
+    );
+
+    return res.json({
+      ok: true,
+      mensaje: 'Contraseña actualizada correctamente.'
+    });
+  } catch (error) {
+    console.error('Error cambiando contraseña:', error);
+
+    return res.status(500).json({
+      ok: false,
+      mensaje: 'Error al cambiar contraseña.',
+      error: error.message
+    });
+  }
+};
+
+/* =====================================================
+   OBTENER USUARIO ACTUAL
+===================================================== */
 
 exports.me = async (req, res) => {
   try {
