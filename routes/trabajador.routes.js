@@ -2,9 +2,31 @@ const express = require('express');
 const router = express.Router();
 
 const trabajadorController = require('../controllers/trabajador.controller');
+const { verificarToken } = require('../middlewares/auth.middleware');
 
-router.get('/', trabajadorController.listarProfesionales);
-router.get('/profesionales', trabajadorController.listarProfesionales);
-router.get('/:id', trabajadorController.detalleProfesional);
+function usar(nombre) {
+  if (typeof trabajadorController[nombre] !== 'function') {
+    return (req, res) => {
+      return res.status(501).json({
+        ok: false,
+        mensaje: `Falta implementar trabajadorController.${nombre}`
+      });
+    };
+  }
+
+  return trabajadorController[nombre];
+}
+
+/*
+  IMPORTANTE:
+  Las rutas específicas deben ir ANTES de /:id.
+*/
+router.get('/profesionales', usar('listarProfesionales'));
+router.get('/destacados', usar('listarDestacados'));
+router.get('/categorias', usar('obtenerCategorias'));
+
+router.put('/estado-conexion', verificarToken, usar('actualizarEstadoConexion'));
+
+router.get('/:id', usar('detalleTrabajador'));
 
 module.exports = router;
