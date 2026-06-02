@@ -14,8 +14,8 @@ if (typeof window.API_URL === 'undefined') {
 function setSession(data) {
   if (!data) return;
 
-  let token = data.token || data?.data?.token || null;
-  let usuario = data.usuario || data?.data?.usuario || null;
+  const token = data.token || data?.data?.token || null;
+  const usuario = data.usuario || data?.data?.usuario || null;
 
   const session = {
     ...data,
@@ -93,7 +93,12 @@ function clearSession() {
 
 function logout() {
   clearSession();
-  window.location.href = 'login.html';
+
+  if (window.location.pathname.includes('/pages/')) {
+    window.location.href = 'login.html';
+  } else {
+    window.location.href = '/pages/login.html';
+  }
 }
 
 function cerrarSesion() {
@@ -315,17 +320,8 @@ const Auth = {
     return data;
   },
 
-  async facebookLogin(accessToken) {
-    const data = await apiFetch('/auth/facebook', {
-      method: 'POST',
-      body: JSON.stringify({ accessToken })
-    });
-
-    if (data.token || data?.data?.token) {
-      setSession(data);
-    }
-
-    return data;
+  async facebookLogin() {
+    throw new Error('Inicio con Facebook aún no está disponible.');
   },
 
   async verifyEmail(token, id = null) {
