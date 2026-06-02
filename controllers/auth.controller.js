@@ -7,9 +7,6 @@ const { pgPool } = require('../config/db');
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-/* =====================================================
-   GENERAR TOKEN JWT
-===================================================== */
 function generarToken(usuario) {
   return jwt.sign(
     {
@@ -20,21 +17,17 @@ function generarToken(usuario) {
       es_cliente: usuario.es_cliente,
       es_trabajador: usuario.es_trabajador
     },
-    process.env.JWT_SECRET,
+    process.env.JWT_SECRET || 'oficiosya_secret_temporal',
     {
       expiresIn: process.env.JWT_EXPIRES || '7d'
     }
   );
 }
 
-/* =====================================================
-   LIMPIAR USUARIO
-===================================================== */
 function limpiarUsuario(usuario) {
   if (!usuario) return null;
 
   const copia = { ...usuario };
-
   delete copia.password_hash;
   delete copia.email_token;
   delete copia.reset_token;
@@ -43,9 +36,6 @@ function limpiarUsuario(usuario) {
   return copia;
 }
 
-/* =====================================================
-   CREAR TRANSPORTER DE CORREO
-===================================================== */
 function crearTransporter() {
   const user = process.env.EMAIL_USER || process.env.MAIL_USER;
   const pass = process.env.EMAIL_PASS || process.env.MAIL_PASS;
@@ -64,9 +54,6 @@ function crearTransporter() {
   });
 }
 
-/* =====================================================
-   ENVIAR CORREO DE VERIFICACIÓN
-===================================================== */
 async function enviarCorreoVerificacion(email, token) {
   const transporter = crearTransporter();
 
@@ -93,6 +80,7 @@ async function enviarCorreoVerificacion(email, token) {
 /* =====================================================
    REGISTRO
 ===================================================== */
+
 exports.registro = async (req, res) => {
   try {
     let {
@@ -227,8 +215,9 @@ exports.registro = async (req, res) => {
 };
 
 /* =====================================================
-   LOGIN NORMAL
+   LOGIN
 ===================================================== */
+
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -314,8 +303,9 @@ exports.login = async (req, res) => {
 };
 
 /* =====================================================
-   LOGIN CON GOOGLE
+   GOOGLE LOGIN
 ===================================================== */
+
 exports.googleLogin = async (req, res) => {
   try {
     const { credential } = req.body;
@@ -356,7 +346,7 @@ exports.googleLogin = async (req, res) => {
       });
     }
 
-    let result = await pgPool.query(
+    const result = await pgPool.query(
       `
       SELECT *
       FROM usuarios
@@ -465,9 +455,9 @@ exports.googleLogin = async (req, res) => {
 };
 
 /* =====================================================
-   VERIFICAR CORREO POR PARAMS
-   Ruta ejemplo: /api/auth/verificar/:token
+   VERIFICAR CORREO
 ===================================================== */
+
 exports.verificarCorreo = async (req, res) => {
   try {
     const { token } = req.params;
@@ -505,8 +495,6 @@ exports.verificarCorreo = async (req, res) => {
       data: result.rows[0]
     });
   } catch (error) {
-    console.error('Error verificando correo:', error);
-
     return res.status(500).json({
       ok: false,
       mensaje: 'Error al verificar correo.',
@@ -515,10 +503,6 @@ exports.verificarCorreo = async (req, res) => {
   }
 };
 
-/* =====================================================
-   VERIFICAR CORREO POR QUERY
-   Ruta ejemplo: /api/auth/verify-email?token=...
-===================================================== */
 exports.verificarCorreoQuery = async (req, res) => {
   try {
     const { token } = req.query;
@@ -556,8 +540,6 @@ exports.verificarCorreoQuery = async (req, res) => {
       data: result.rows[0]
     });
   } catch (error) {
-    console.error('Error verificando correo:', error);
-
     return res.status(500).json({
       ok: false,
       mensaje: 'Error al verificar correo.',
@@ -569,6 +551,7 @@ exports.verificarCorreoQuery = async (req, res) => {
 /* =====================================================
    REENVIAR VERIFICACIÓN
 ===================================================== */
+
 exports.reenviarVerificacion = async (req, res) => {
   try {
     const { email } = req.body;
@@ -627,8 +610,6 @@ exports.reenviarVerificacion = async (req, res) => {
       mensaje: 'Correo de verificación reenviado.'
     });
   } catch (error) {
-    console.error('Error reenviando verificación:', error);
-
     return res.status(500).json({
       ok: false,
       mensaje: 'Error al reenviar verificación.',
@@ -638,8 +619,9 @@ exports.reenviarVerificacion = async (req, res) => {
 };
 
 /* =====================================================
-   SOLICITAR RESET DE CONTRASEÑA
+   RECUPERAR CONTRASEÑA
 ===================================================== */
+
 exports.solicitarResetPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -708,8 +690,6 @@ exports.solicitarResetPassword = async (req, res) => {
       mensaje: 'Si el correo existe, se enviarán instrucciones.'
     });
   } catch (error) {
-    console.error('Error solicitando reset:', error);
-
     return res.status(500).json({
       ok: false,
       mensaje: 'Error solicitando recuperación.',
@@ -718,13 +698,9 @@ exports.solicitarResetPassword = async (req, res) => {
   }
 };
 
-/* =====================================================
-   RESET PASSWORD CON TOKEN
-===================================================== */
 exports.resetPassword = async (req, res) => {
   try {
     const { token, password, nuevaPassword } = req.body;
-
     const nuevaClave = password || nuevaPassword;
 
     if (!token || !nuevaClave) {
@@ -778,8 +754,6 @@ exports.resetPassword = async (req, res) => {
       mensaje: 'Contraseña actualizada correctamente.'
     });
   } catch (error) {
-    console.error('Error cambiando contraseña:', error);
-
     return res.status(500).json({
       ok: false,
       mensaje: 'Error al cambiar contraseña.',
@@ -789,8 +763,9 @@ exports.resetPassword = async (req, res) => {
 };
 
 /* =====================================================
-   CAMBIAR CONTRASEÑA DESDE MI PANEL
+   CAMBIAR CONTRASEÑA
 ===================================================== */
+
 exports.cambiarPassword = async (req, res) => {
   try {
     const usuarioId = req.user.id;
@@ -886,8 +861,6 @@ exports.cambiarPassword = async (req, res) => {
       mensaje: 'Contraseña actualizada correctamente.'
     });
   } catch (error) {
-    console.error('Error cambiando contraseña:', error);
-
     return res.status(500).json({
       ok: false,
       mensaje: 'Error al cambiar contraseña.',
@@ -897,8 +870,9 @@ exports.cambiarPassword = async (req, res) => {
 };
 
 /* =====================================================
-   OBTENER USUARIO AUTENTICADO
+   USUARIO ACTUAL
 ===================================================== */
+
 exports.me = async (req, res) => {
   try {
     const result = await pgPool.query(
@@ -928,8 +902,6 @@ exports.me = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error obteniendo usuario:', error);
-
     return res.status(500).json({
       ok: false,
       mensaje: 'Error obteniendo usuario.',
