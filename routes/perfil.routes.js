@@ -33,6 +33,13 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
+router.get('/debug', (req, res) => {
+  res.json({
+    ok: true,
+    mensaje: 'Rutas de perfil cargadas correctamente.'
+  });
+});
+
 router.get('/me', verificarToken, usarFuncion('obtenerMiPerfil'));
 router.put('/me', verificarToken, usarFuncion('actualizarMiPerfil'));
 router.put('/datos', verificarToken, usarFuncion('actualizarMiPerfil'));
