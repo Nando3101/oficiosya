@@ -43,7 +43,6 @@ router.post('/registro', usarFuncion('registro'));
 router.post('/register', usarFuncion('registro'));
 
 router.post('/login', usarFuncion('login'));
-
 router.post('/google', usarFuncion('googleLogin'));
 
 router.get('/verificar/:token', usarFuncion('verificarCorreo'));
