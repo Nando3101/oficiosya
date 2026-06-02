@@ -112,3 +112,32 @@ exports.crearCalificacion = async (req, res) => {
     });
   }
 };
+
+exports.obtenerCalificacionSolicitud = async (req, res) => {
+  try {
+    const solicitudId = Number(req.params.solicitudId);
+
+    const result = await pgPool.query(
+      `
+      SELECT *
+      FROM calificaciones
+      WHERE solicitud_id = $1
+      ORDER BY createdat DESC
+      LIMIT 1
+      `,
+      [solicitudId]
+    );
+
+    return res.json({
+      ok: true,
+      calificacion: result.rows[0] || null,
+      data: result.rows[0] || null
+    });
+  } catch (error) {
+    return res.status(500).json({
+      ok: false,
+      mensaje: 'Error obteniendo calificación.',
+      error: error.message
+    });
+  }
+};

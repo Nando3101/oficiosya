@@ -1,37 +1,63 @@
-const { sql, poolPromise } = require('../config/db');
+const { pgPool } = require('../config/db');
 
 exports.misStats = async (req, res) => {
   try {
-    const usuarioId = req.user?.id || req.query.usuario_id || req.body.usuario_id || null;
-    const pool = await poolPromise;
+    const usuarioId = req.user.id;
 
-    let result;
+    const solicitudes = await pgPool.query(
+      `
+      SELECT COUNT(*) AS total
+      FROM solicitudes
+      WHERE cliente_id = $1 OR trabajador_id = $1
+      `,
+      [usuarioId]
+    );
 
-    if (usuarioId) {
-      result = await pool.request()
-        .input('usuario_id', sql.Int, usuarioId)
-        .query(`
-          SELECT
-            (SELECT COUNT(*) FROM solicitudes WHERE cliente_id = @usuario_id AND estado IN ('abierta', 'confirmada', 'en_curso')) AS solicitudes_activas,
-            (SELECT COUNT(*) FROM servicios WHERE cliente_id = @usuario_id AND estado = 'finalizado') AS servicios_completados,
-            (SELECT ISNULL(AVG(CAST(puntuacion AS FLOAT)), 0) FROM calificaciones WHERE calificado_id = @usuario_id) AS calificacion_promedio,
-            0 AS mensajes
-        `);
-    } else {
-      result = await pool.request().query(`
-        SELECT
-          (SELECT COUNT(*) FROM solicitudes WHERE estado IN ('abierta', 'confirmada', 'en_curso')) AS solicitudes_activas,
-          (SELECT COUNT(*) FROM servicios WHERE estado = 'finalizado') AS servicios_completados,
-          (SELECT ISNULL(AVG(CAST(puntuacion AS FLOAT)), 0) FROM calificaciones) AS calificacion_promedio,
-          0 AS mensajes
-      `);
-    }
+    const postulaciones = await pgPool.query(
+      `
+      SELECT COUNT(*) AS total
+      FROM postulaciones
+      WHERE trabajador_id = $1
+      `,
+      [usuarioId]
+    );
 
-    res.json(result.recordset[0]);
+    const calificaciones = await pgPool.query(
+      `
+      SELECT
+        COUNT(*) AS total,
+        COALESCE(AVG(CAST(puntuacion AS DOUBLE PRECISION)), 0) AS promedio
+      FROM calificaciones
+      WHERE calificado_id = $1
+      `,
+      [usuarioId]
+    );
+
+    const trabajos = await pgPool.query(
+      `
+      SELECT COUNT(*) AS total
+      FROM trabajos_realizados
+      WHERE trabajador_id = $1
+      `,
+      [usuarioId]
+    );
+
+    return res.json({
+      ok: true,
+      stats: {
+        solicitudes: Number(solicitudes.rows[0].total),
+        postulaciones: Number(postulaciones.rows[0].total),
+        calificaciones: Number(calificaciones.rows[0].total),
+        promedio: Number(calificaciones.rows[0].promedio),
+        trabajos: Number(trabajos.rows[0].total)
+      }
+    });
   } catch (error) {
-    console.error('Error al obtener estadísticas:', error);
-    res.status(500).json({
-      mensaje: 'Error al cargar estadísticas.',
+    console.error('Error obteniendo estadísticas:', error);
+
+    return res.status(500).json({
+      ok: false,
+      mensaje: 'Error obteniendo estadísticas.',
       error: error.message
     });
   }

@@ -2,12 +2,14 @@
   function obtenerUsuarioNavbar() {
     try {
       const session = localStorage.getItem('oficiosya_session');
+
       if (session) {
         const data = JSON.parse(session);
         return data.usuario || null;
       }
 
       const usuario = localStorage.getItem('oficiosya_usuario');
+
       return usuario ? JSON.parse(usuario) : null;
     } catch (error) {
       return null;
@@ -27,6 +29,7 @@
   function inicialesUsuario(usuario) {
     const n = usuario?.nombres || usuario?.nombre || '';
     const a = usuario?.apellidos || '';
+
     return `${n.charAt(0)}${a.charAt(0)}`.toUpperCase() || 'U';
   }
 
@@ -45,7 +48,10 @@
       }
     });
 
-    const nav = document.querySelector('nav') || document.querySelector('header') || document.querySelector('.navbar');
+    const nav =
+      document.querySelector('nav') ||
+      document.querySelector('header') ||
+      document.querySelector('.navbar');
 
     if (!nav || document.getElementById('user-navbar-box')) {
       return;

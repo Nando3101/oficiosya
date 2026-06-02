@@ -210,3 +210,11 @@ CREATE INDEX IF NOT EXISTS idx_postulaciones_solicitud ON postulaciones(solicitu
 CREATE INDEX IF NOT EXISTS idx_postulaciones_trabajador ON postulaciones(trabajador_id);
 CREATE INDEX IF NOT EXISTS idx_mensajes_solicitud ON mensajes(solicitud_id);
 CREATE INDEX IF NOT EXISTS idx_notificaciones_usuario ON notificaciones(usuario_id);
+
+ALTER TABLE trabajos_realizados ADD COLUMN IF NOT EXISTS url_imagen VARCHAR(500);
+ALTER TABLE trabajos_realizados ADD COLUMN IF NOT EXISTS public_id VARCHAR(255);
+
+ALTER TABLE verificaciones ADD COLUMN IF NOT EXISTS tipo_documento VARCHAR(100);
+ALTER TABLE verificaciones ADD COLUMN IF NOT EXISTS documento_url VARCHAR(500);
+ALTER TABLE verificaciones ADD COLUMN IF NOT EXISTS archivo_url VARCHAR(500);
+ALTER TABLE verificaciones ADD COLUMN IF NOT EXISTS observacion TEXT;

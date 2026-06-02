@@ -1,9 +1,9 @@
 /* =====================================================
    OFICIOSYA - API GENERAL FRONTEND
-   Archivo: frontend/js/api.js
+   Archivo: public/js/api.js
 ===================================================== */
 
-if (typeof API_URL === 'undefined') {
+if (typeof window.API_URL === 'undefined') {
   console.error('No se encontró API_URL. Revisa que config.js esté cargado antes de api.js.');
 }
 
@@ -44,7 +44,6 @@ function getSession() {
     }
 
     return null;
-
   } catch (error) {
     console.error('Error al leer sesión:', error);
     return null;
@@ -122,8 +121,8 @@ function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-function showAlert(message, type = 'info') {
-  const alertBox = document.getElementById('alert-box');
+function showAlert(message, type = 'info', containerId = 'alert-box') {
+  const alertBox = document.getElementById(containerId) || document.getElementById('alert-box');
 
   if (!alertBox) {
     alert(message);
@@ -132,15 +131,15 @@ function showAlert(message, type = 'info') {
 
   alertBox.style.display = 'block';
   alertBox.textContent = message;
-  alertBox.className = `alert-box ${type}`;
+  alertBox.className = `alert-box ${type} alert-${type}`;
 
   setTimeout(() => {
     alertBox.style.display = 'none';
   }, 4500);
 }
 
-function hideAlert() {
-  const alertBox = document.getElementById('alert-box');
+function hideAlert(containerId = 'alert-box') {
+  const alertBox = document.getElementById(containerId) || document.getElementById('alert-box');
 
   if (alertBox) {
     alertBox.style.display = 'none';
@@ -170,6 +169,48 @@ function togglePassword(inputId, btn) {
   }
 }
 
+function checkPasswordStrength(password) {
+  const strengthDiv = document.getElementById('pass-strength');
+  const label = document.getElementById('strength-label');
+
+  const bars = [
+    document.getElementById('bar1'),
+    document.getElementById('bar2'),
+    document.getElementById('bar3'),
+    document.getElementById('bar4')
+  ];
+
+  if (!strengthDiv) return;
+
+  if (!password) {
+    strengthDiv.style.display = 'none';
+    return;
+  }
+
+  strengthDiv.style.display = 'flex';
+
+  let score = 0;
+
+  if (password.length >= 8) score++;
+  if (/[A-Z]/.test(password)) score++;
+  if (/[0-9]/.test(password)) score++;
+  if (/[^A-Za-z0-9]/.test(password)) score++;
+
+  bars.forEach((bar, index) => {
+    if (!bar) return;
+
+    bar.className = 'strength-bar';
+
+    if (index < score) {
+      bar.classList.add('active');
+    }
+  });
+
+  if (label) {
+    label.textContent = ['Muy débil', 'Débil', 'Media', 'Buena', 'Fuerte'][score];
+  }
+}
+
 /* =====================================================
    FETCH GENERAL
 ===================================================== */
@@ -193,13 +234,12 @@ async function apiFetch(endpoint, options = {}) {
   let data;
 
   try {
-    response = await fetch(`${API_URL}${endpoint}`, {
+    response = await fetch(`${window.API_URL}${endpoint}`, {
       ...options,
       headers
     });
 
     data = await response.json().catch(() => ({}));
-
   } catch (error) {
     throw new Error('No se pudo conectar con el servidor. Verifica que el backend esté encendido.');
   }
@@ -237,12 +277,23 @@ const Auth = {
     });
   },
 
-  async verifyEmail(token) {
-    return apiFetch(`/auth/verify-email?token=${encodeURIComponent(token)}`);
+  async facebookLogin(accessToken) {
+    return apiFetch('/auth/facebook', {
+      method: 'POST',
+      body: JSON.stringify({ accessToken })
+    });
+  },
+
+  async verifyEmail(token, id = null) {
+    if (id) {
+      return apiFetch(`/auth/verify-email?token=${encodeURIComponent(token)}&id=${encodeURIComponent(id)}`);
+    }
+
+    return apiFetch(`/auth/verificar/${encodeURIComponent(token)}`);
   },
 
   async resendVerification(email) {
-    return apiFetch('/auth/resend-verification', {
+    return apiFetch('/auth/reenviar-verificacion', {
       method: 'POST',
       body: JSON.stringify({ email })
     });
@@ -255,17 +306,28 @@ const Auth = {
     });
   },
 
-  async resetPassword(token, password) {
+  async resetPassword(tokenOrData, password = null) {
+    const body = typeof tokenOrData === 'object'
+      ? {
+          ...tokenOrData,
+          password: tokenOrData.password || tokenOrData.nuevaPassword
+        }
+      : { token: tokenOrData, password };
+
     return apiFetch('/auth/reset-password', {
       method: 'POST',
-      body: JSON.stringify({ token, password })
+      body: JSON.stringify(body)
     });
   },
 
-  async changePassword(actual, nueva) {
+  async changePassword(actual, nueva = null) {
+    const body = typeof actual === 'object'
+      ? actual
+      : { actual, nueva };
+
     return apiFetch('/auth/change-password', {
       method: 'POST',
-      body: JSON.stringify({ actual, nueva })
+      body: JSON.stringify(body)
     });
   }
 };
@@ -280,7 +342,7 @@ const Perfil = {
   },
 
   async actualizarDatos(datos) {
-    return apiFetch('/perfil/datos', {
+    return apiFetch('/perfil/me', {
       method: 'PUT',
       body: JSON.stringify(datos)
     });
@@ -297,6 +359,10 @@ const Perfil = {
     return apiFetch('/perfil/profesional');
   },
 
+  async obtenerProfesional() {
+    return apiFetch('/perfil/profesional');
+  },
+
   async actualizarProfesional(datos) {
     return apiFetch('/perfil/profesional', {
       method: 'PUT',
@@ -308,10 +374,14 @@ const Perfil = {
     return apiFetch('/perfil/verificaciones');
   },
 
+  async misVerificaciones() {
+    return apiFetch('/perfil/verificaciones');
+  },
+
   async subirVerificacion(datos) {
     return apiFetch('/perfil/verificacion', {
       method: 'POST',
-      body: JSON.stringify(datos)
+      body: datos instanceof FormData ? datos : JSON.stringify(datos)
     });
   },
 
@@ -328,7 +398,13 @@ const Perfil = {
 const Solicitudes = {
   async categorias() {
     const data = await apiFetch('/solicitudes/categorias');
-    return data.categorias || data || [];
+    const categorias = data.categorias || data || [];
+
+    if (Array.isArray(categorias)) {
+      categorias.categorias = categorias;
+    }
+
+    return categorias;
   },
 
   async listarAbiertas() {
@@ -459,7 +535,7 @@ const Calificaciones = {
   },
 
   async recibidas(usuarioId) {
-    const data = await apiFetch(`/calificaciones/recibidas/${usuarioId}`);
+    const data = await apiFetch(`/calificaciones/usuario/${usuarioId}`);
     return data.calificaciones || data || [];
   },
 
@@ -509,10 +585,7 @@ const Admin = {
   async gestionarVerificacion(id, estado, observacion = '') {
     return apiFetch(`/admin/verificaciones/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({
-        estado,
-        observacion
-      })
+      body: JSON.stringify({ estado, observacion })
     });
   }
 };
@@ -523,18 +596,18 @@ const Admin = {
 
 const Chat = {
   async mensajes(solicitudId) {
-    return apiFetch(`/chat/${solicitudId}`);
+    return apiFetch(`/chat/solicitud/${solicitudId}`);
   },
 
   async enviar(solicitudId, mensaje) {
-    return apiFetch(`/chat/${solicitudId}`, {
+    return apiFetch(`/chat/solicitud/${solicitudId}`, {
       method: 'POST',
       body: JSON.stringify({ mensaje })
     });
   },
 
   async marcarLeido(solicitudId) {
-    return apiFetch(`/chat/${solicitudId}/leido`, {
+    return apiFetch(`/chat/solicitud/${solicitudId}/leido`, {
       method: 'PUT'
     });
   }
@@ -571,30 +644,21 @@ const TiempoReal = {
   async ubicacionCliente(solicitudId, latitud, longitud) {
     return apiFetch(`/solicitudes/${solicitudId}/ubicacion-cliente`, {
       method: 'PUT',
-      body: JSON.stringify({
-        latitud,
-        longitud
-      })
+      body: JSON.stringify({ latitud, longitud })
     });
   },
 
   async ubicacionTrabajador(solicitudId, latitud, longitud, estado_recorrido = 'trabajador_en_camino') {
     return apiFetch(`/solicitudes/${solicitudId}/ubicacion`, {
       method: 'PUT',
-      body: JSON.stringify({
-        latitud,
-        longitud,
-        estado_recorrido
-      })
+      body: JSON.stringify({ latitud, longitud, estado_recorrido })
     });
   },
 
   async estadoRecorrido(solicitudId, estado_recorrido) {
     return apiFetch(`/solicitudes/${solicitudId}/recorrido`, {
       method: 'PUT',
-      body: JSON.stringify({
-        estado_recorrido
-      })
+      body: JSON.stringify({ estado_recorrido })
     });
   }
 };
@@ -605,7 +669,22 @@ const TiempoReal = {
 
 const Stats = {
   async resumen() {
-    return apiFetch('/stats');
+    return this.misStats();
+  },
+
+  async misStats() {
+    const data = await apiFetch('/stats');
+    const stats = data.stats || data || {};
+
+    return {
+      solicitudes_activas: Number(stats.solicitudes_activas ?? stats.solicitudes ?? 0),
+      servicios_completados: Number(stats.servicios_completados ?? stats.trabajos ?? 0),
+      calificacion_promedio: Number(stats.calificacion_promedio ?? stats.promedio ?? 0).toFixed(1),
+      postulaciones_enviadas: Number(stats.postulaciones_enviadas ?? stats.postulaciones ?? 0),
+      mensajes: Number(stats.mensajes ?? 0),
+      trabajos: Number(stats.trabajos ?? stats.servicios_completados ?? 0),
+      raw: stats
+    };
   }
 };
 
@@ -615,8 +694,29 @@ const Stats = {
 
 const Trabajos = {
   async listar() {
-    const data = await apiFetch('/trabajos');
-    return data.trabajos || data || [];
+    return this.misTrabajos();
+  },
+
+  async misTrabajos() {
+    const data = await apiFetch('/trabajos/mios');
+
+    return {
+      ...data,
+      trabajos: data.trabajos || data.data || []
+    };
+  },
+
+  async subir(formData) {
+    return apiFetch('/trabajos', {
+      method: 'POST',
+      body: formData
+    });
+  },
+
+  async eliminar(id) {
+    return apiFetch(`/trabajos/${id}`, {
+      method: 'DELETE'
+    });
   },
 
   async detalle(id) {
@@ -659,3 +759,4 @@ window.showAlert = showAlert;
 window.hideAlert = hideAlert;
 window.setLoading = setLoading;
 window.togglePassword = togglePassword;
+window.checkPasswordStrength = checkPasswordStrength;

@@ -14,6 +14,10 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const server = http.createServer(app);
 
+/* =====================================================
+   MIDDLEWARES GENERALES
+===================================================== */
+
 app.use(
   helmet({
     contentSecurityPolicy: false,
@@ -35,8 +39,16 @@ app.use(
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
+/* =====================================================
+   ARCHIVOS ESTÁTICOS
+===================================================== */
+
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(express.static(path.join(__dirname, 'public')));
+
+/* =====================================================
+   SOCKET.IO
+===================================================== */
 
 const io = new Server(server, {
   cors: {
@@ -97,6 +109,10 @@ io.on('connection', (socket) => {
   });
 });
 
+/* =====================================================
+   CARGAR RUTAS DE FORMA SEGURA
+===================================================== */
+
 function cargarRuta(ruta, archivo) {
   try {
     const route = require(archivo);
@@ -108,17 +124,40 @@ function cargarRuta(ruta, archivo) {
   }
 }
 
+/* =====================================================
+   RUTAS API
+===================================================== */
+
 cargarRuta('/api/auth', './routes/auth.routes');
-cargarRuta('/api/solicitudes', './routes/solicitud.routes');
 cargarRuta('/api/perfil', './routes/perfil.routes');
-cargarRuta('/api/trabajos', './routes/trabajo.routes');
-cargarRuta('/api/stats', './routes/stats.routes');
+cargarRuta('/api/solicitudes', './routes/solicitud.routes');
 cargarRuta('/api/trabajadores', './routes/trabajador.routes');
 cargarRuta('/api/calificaciones', './routes/calificacion.routes');
-cargarRuta('/api/admin', './routes/admin.routes');
 cargarRuta('/api/chat', './routes/chat.routes');
 cargarRuta('/api/notificaciones', './routes/notificacion.routes');
+cargarRuta('/api/admin', './routes/admin.routes');
+cargarRuta('/api/stats', './routes/stats.routes');
+cargarRuta('/api/trabajos', './routes/trabajo.routes');
 cargarRuta('/api/estado', './routes/estado.routes');
+
+/* =====================================================
+   RUTA DE PRUEBA PRINCIPAL
+===================================================== */
+
+app.get('/api', (req, res) => {
+  res.json({
+    ok: true,
+    mensaje: 'API OficiosYA funcionando correctamente.',
+    socket: true,
+    database: process.env.DATABASE_URL
+      ? 'PostgreSQL configurado'
+      : 'Falta DATABASE_URL'
+  });
+});
+
+/* =====================================================
+   RUTA DE DIAGNÓSTICO POSTGRESQL
+===================================================== */
 
 app.get('/api/debug/db', async (req, res) => {
   try {
@@ -140,14 +179,22 @@ app.get('/api/debug/db', async (req, res) => {
     let totalProfesionales = '0';
 
     try {
-      const categorias = await pgPool.query(`SELECT COUNT(*) AS total FROM categorias`);
+      const categorias = await pgPool.query(`
+        SELECT COUNT(*) AS total
+        FROM categorias
+      `);
+
       totalCategorias = categorias.rows[0].total;
     } catch (error) {
       totalCategorias = 'ERROR: ' + error.message;
     }
 
     try {
-      const usuarios = await pgPool.query(`SELECT COUNT(*) AS total FROM usuarios`);
+      const usuarios = await pgPool.query(`
+        SELECT COUNT(*) AS total
+        FROM usuarios
+      `);
+
       totalUsuarios = usuarios.rows[0].total;
     } catch (error) {
       totalUsuarios = 'ERROR: ' + error.message;
@@ -157,7 +204,8 @@ app.get('/api/debug/db', async (req, res) => {
       const profesionales = await pgPool.query(`
         SELECT COUNT(*) AS total
         FROM usuarios u
-        LEFT JOIN perfiles_trabajador p ON p.usuario_id = u.id
+        LEFT JOIN perfiles_trabajador p 
+          ON p.usuario_id = u.id
         WHERE u.es_trabajador = 1
            OR u.rol IN ('trabajador', 'cliente_trabajador')
            OR p.id IS NOT NULL
@@ -186,18 +234,17 @@ app.get('/api/debug/db', async (req, res) => {
   }
 });
 
-app.get('/api', (req, res) => {
-  res.json({
-    ok: true,
-    mensaje: 'API OficiosYA funcionando correctamente en Railway.',
-    socket: true,
-    database: process.env.DATABASE_URL ? 'PostgreSQL configurado' : 'Falta DATABASE_URL'
-  });
-});
+/* =====================================================
+   RUTA PRINCIPAL DEL FRONTEND
+===================================================== */
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
+/* =====================================================
+   MANEJO DE RUTAS NO ENCONTRADAS
+===================================================== */
 
 app.use((req, res) => {
   if (!req.originalUrl.startsWith('/api')) {
@@ -211,6 +258,10 @@ app.use((req, res) => {
   });
 });
 
+/* =====================================================
+   MANEJO GLOBAL DE ERRORES
+===================================================== */
+
 app.use((error, req, res, next) => {
   console.error('Error global:', error);
 
@@ -220,6 +271,10 @@ app.use((error, req, res, next) => {
     error: error.message
   });
 });
+
+/* =====================================================
+   INICIAR SERVIDOR
+===================================================== */
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Servidor OficiosYA corriendo en puerto ${PORT}`);

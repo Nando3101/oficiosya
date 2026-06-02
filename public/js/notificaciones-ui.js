@@ -6,6 +6,7 @@
 
     const style = document.createElement('style');
     style.id = 'notificaciones-style';
+
     style.innerHTML = `
       .notif-widget {
         position: fixed;

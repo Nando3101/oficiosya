@@ -1,82 +1,83 @@
-const TrabajoModel = require('../models/trabajo.model');
-
-function obtenerUsuarioId(req) {
-  return req.user?.id || req.body?.trabajador_id || req.body?.usuario_id || null;
-}
+const { pgPool } = require('../config/db');
 
 exports.misTrabajos = async (req, res) => {
   try {
-    const trabajadorId = obtenerUsuarioId(req);
+    const usuarioId = req.user.id;
 
-    if (!trabajadorId) {
-      return res.json({
-        ok: true,
-        trabajos: []
-      });
-    }
+    const result = await pgPool.query(
+      `
+      SELECT *
+      FROM trabajos_realizados
+      WHERE trabajador_id = $1 OR cliente_id = $1
+      ORDER BY createdat DESC
+      `,
+      [usuarioId]
+    );
 
-    const trabajos = await TrabajoModel.listarPorTrabajador(trabajadorId);
-
-    res.json({
+    return res.json({
       ok: true,
-      trabajos
+      trabajos: result.rows,
+      data: result.rows
     });
   } catch (error) {
-    console.error('Error al cargar trabajos:', error);
+    console.error('Error obteniendo trabajos:', error);
 
-    res.status(500).json({
+    return res.status(500).json({
       ok: false,
-      mensaje: 'Error al cargar trabajos.',
-      error: error.message,
-      trabajos: []
+      mensaje: 'Error obteniendo trabajos.',
+      error: error.message
     });
   }
 };
 
 exports.subirTrabajo = async (req, res) => {
   try {
-    const trabajadorId = obtenerUsuarioId(req);
+    const usuarioId = req.user.id;
 
-    if (!trabajadorId) {
-      return res.status(400).json({
-        ok: false,
-        mensaje: 'No se pudo identificar al trabajador.'
-      });
-    }
+    const {
+      solicitud_id,
+      cliente_id,
+      descripcion
+    } = req.body;
 
-    let urlImagen = req.body.url_imagen || null;
-    let publicId = req.body.public_id || null;
+    const urlImagen = req.file ? `/uploads/${req.file.filename}` : null;
 
-    if (req.file) {
-      urlImagen = `/uploads/${req.file.filename}`;
-      publicId = req.file.filename;
-    }
+    const result = await pgPool.query(
+      `
+      INSERT INTO trabajos_realizados (
+        solicitud_id,
+        trabajador_id,
+        cliente_id,
+        url_imagen,
+        descripcion,
+        estado,
+        createdat,
+        updatedat
+      )
+      VALUES ($1, $2, $3, $4, $5, 'finalizado', NOW(), NOW())
+      RETURNING *
+      `,
+      [
+        solicitud_id || null,
+        usuarioId,
+        cliente_id || null,
+        urlImagen,
+        descripcion || null
+      ]
+    );
 
-    if (!urlImagen) {
-      return res.status(400).json({
-        ok: false,
-        mensaje: 'Debe enviar una imagen.'
-      });
-    }
-
-    const trabajo = await TrabajoModel.crear({
-      trabajador_id: trabajadorId,
-      url_imagen: urlImagen,
-      public_id: publicId,
-      descripcion: req.body.descripcion || null
-    });
-
-    res.status(201).json({
+    return res.status(201).json({
       ok: true,
-      mensaje: 'Trabajo subido correctamente.',
-      trabajo
+      mensaje: 'Trabajo registrado correctamente.',
+      trabajo: result.rows[0],
+      data: result.rows[0]
     });
   } catch (error) {
-    console.error('Error al subir trabajo:', error);
+    console.error('Error subiendo trabajo:', error);
 
-    res.status(500).json({
+    return res.status(500).json({
       ok: false,
-      mensaje: 'Error al subir trabajo.',
+      mensaje: 'Error subiendo trabajo.',
       error: error.message
     });
   }
@@ -84,36 +85,36 @@ exports.subirTrabajo = async (req, res) => {
 
 exports.eliminarTrabajo = async (req, res) => {
   try {
-    const trabajadorId = obtenerUsuarioId(req);
-    const { id } = req.params;
+    const usuarioId = req.user.id;
+    const id = Number(req.params.id);
 
-    if (!trabajadorId) {
-      return res.status(400).json({
-        ok: false,
-        mensaje: 'No se pudo identificar al trabajador.'
-      });
-    }
+    const result = await pgPool.query(
+      `
+      DELETE FROM trabajos_realizados
+      WHERE id = $1
+      AND trabajador_id = $2
+      RETURNING *
+      `,
+      [id, usuarioId]
+    );
 
-    const eliminado = await TrabajoModel.eliminar(id, trabajadorId);
-
-    if (!eliminado) {
+    if (result.rows.length === 0) {
       return res.status(404).json({
         ok: false,
-        mensaje: 'Trabajo no encontrado.'
+        mensaje: 'Trabajo no encontrado o no tienes permiso para eliminarlo.'
       });
     }
 
-    res.json({
+    return res.json({
       ok: true,
-      mensaje: 'Trabajo eliminado correctamente.',
-      trabajo: eliminado
+      mensaje: 'Trabajo eliminado correctamente.'
     });
   } catch (error) {
-    console.error('Error al eliminar trabajo:', error);
+    console.error('Error eliminando trabajo:', error);
 
-    res.status(500).json({
+    return res.status(500).json({
       ok: false,
-      mensaje: 'Error al eliminar trabajo.',
+      mensaje: 'Error eliminando trabajo.',
       error: error.message
     });
   }

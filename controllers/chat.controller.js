@@ -41,12 +41,46 @@ exports.enviarMensaje = async (req, res) => {
   try {
     const solicitudId = Number(req.params.solicitudId);
     const emisorId = req.user.id;
-    const { receptor_id, mensaje } = req.body;
+    let { receptor_id, mensaje } = req.body;
 
-    if (!receptor_id || !mensaje) {
+    if (!mensaje) {
       return res.status(400).json({
         ok: false,
-        mensaje: 'Receptor y mensaje son obligatorios.'
+        mensaje: 'El mensaje es obligatorio.'
+      });
+    }
+
+    if (!receptor_id) {
+      const solicitud = await pgPool.query(
+        `
+        SELECT cliente_id, trabajador_id
+        FROM solicitudes
+        WHERE id = $1
+        LIMIT 1
+        `,
+        [solicitudId]
+      );
+
+      if (solicitud.rows.length === 0) {
+        return res.status(404).json({
+          ok: false,
+          mensaje: 'Solicitud no encontrada.'
+        });
+      }
+
+      const row = solicitud.rows[0];
+
+      if (Number(row.cliente_id) === Number(emisorId)) {
+        receptor_id = row.trabajador_id;
+      } else {
+        receptor_id = row.cliente_id;
+      }
+    }
+
+    if (!receptor_id) {
+      return res.status(400).json({
+        ok: false,
+        mensaje: 'Todavía no hay otro participante asignado para este chat.'
       });
     }
 
@@ -66,33 +100,6 @@ exports.enviarMensaje = async (req, res) => {
       [solicitudId, emisorId, receptor_id, mensaje]
     );
 
-    await pgPool.query(
-      `
-      INSERT INTO notificaciones (
-        usuario_id,
-        titulo,
-        mensaje,
-        tipo,
-        leida,
-        createdat
-      )
-      VALUES ($1, 'Nuevo mensaje', 'Tienes un nuevo mensaje.', 'mensaje', 0, NOW())
-      `,
-      [receptor_id]
-    );
-
-    const io = req.app.get('io');
-
-    if (io) {
-      io.to(`solicitud_${solicitudId}`).emit('mensaje_recibido', result.rows[0]);
-      io.to(`usuario_${receptor_id}`).emit('notificacion', {
-        tipo: 'mensaje',
-        titulo: 'Nuevo mensaje',
-        mensaje: 'Tienes un nuevo mensaje.',
-        createdat: new Date()
-      });
-    }
-
     return res.status(201).json({
       ok: true,
       mensaje: 'Mensaje enviado correctamente.',
@@ -105,6 +112,34 @@ exports.enviarMensaje = async (req, res) => {
     return res.status(500).json({
       ok: false,
       mensaje: 'Error enviando mensaje.',
+      error: error.message
+    });
+  }
+};
+
+exports.marcarLeido = async (req, res) => {
+  try {
+    const solicitudId = Number(req.params.solicitudId);
+    const usuarioId = req.user.id;
+
+    await pgPool.query(
+      `
+      UPDATE mensajes
+      SET leido = 1
+      WHERE solicitud_id = $1
+      AND receptor_id = $2
+      `,
+      [solicitudId, usuarioId]
+    );
+
+    return res.json({
+      ok: true,
+      mensaje: 'Mensajes marcados como leídos.'
+    });
+  } catch (error) {
+    return res.status(500).json({
+      ok: false,
+      mensaje: 'Error marcando mensajes.',
       error: error.message
     });
   }
