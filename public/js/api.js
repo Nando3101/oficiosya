@@ -291,17 +291,17 @@ const Auth = {
   },
 
   async register(datos) {
-    const data = await apiFetch('/auth/registro', {
-      method: 'POST',
-      body: JSON.stringify(datos)
-    });
+  const data = await apiFetch('/auth/registro', {
+    method: 'POST',
+    body: JSON.stringify(datos)
+  });
 
-    if (data.token || data?.data?.token) {
-      setSession(data);
-    }
+  if (data.token || data?.data?.token) {
+    setSession(data);
+  }
 
-    return data;
-  },
+  return data;
+},
 
   async registro(datos) {
     return this.register(datos);
